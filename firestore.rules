@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() { return request.auth != null; }
+
+    // Documentos do casal (finanças, viagens, metas, checklist)
+    match /casais/{casalId} {
+      // Dono: o ID do documento é o próprio UID do usuário
+      function souDono() {
+        return autenticado() && casalId == request.auth.uid;
+      }
+      // Membro: e-mail do usuário consta no mapa 'membros' do documento
+      function souMembro() {
+        return autenticado()
+          && resource.data.membros != null
+          && request.auth.token.email in resource.data.membros;
+      }
+
+      allow create: if souDono();
+      allow read, write: if souDono() || souMembro();
+      // Permite a um parceiro entrar (adicionar seu e-mail) num espaço com < 2 membros
+      allow update: if autenticado()
+        && request.resource.data.membros != null
+        && request.auth.token.email in request.resource.data.membros
+        && (resource.data.membros == null || resource.data.membros.size() < 2);
+    }
+
+    // Convites de parceiro
+    match /convites/{codigo} {
+      allow get, create, delete: if autenticado();
+    }
+
+    // Bloqueia todo o resto
+    match /{document=**} { allow read, write: if false; }
+  }
+}

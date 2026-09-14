@@ -1,0 +1,13 @@
+{
+  "name": "plannerduo",
+  "version": "1.0.0",
+  "description": "Aplicação web privada para casais gerenciarem finanças compartilhadas e planejamento de viagens.",
+  "private": true,
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "fast-check": "^3.23.1",
+    "vitest": "^2.1.8"
+  }
+}
