@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlannerDuo — Painel do Casal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<!-- ════════════════════════════════════════════════
+     LOADER
+════════════════════════════════════════════════ -->
+<div id="loader-tela">
+  <div class="loader-logo">
+    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="40" height="40" rx="10" fill="url(#lg)"/>
+      <path d="M20 30s-9-5.5-9-12a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 6.5-9 12-9 12z" fill="white"/>
+      <defs>
+        <linearGradient id="lg" x1="0" y1="0" x2="40" y2="40">
+          <stop offset="0%" stop-color="#f97316"/>
+          <stop offset="100%" stop-color="#f43f5e"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    PlannerDuo
+  </div>
+  <div class="loader-bar"></div>
+  <p id="loader-msg" style="font-size:.8rem;color:var(--text-muted);margin-top:8px;min-height:20px"></p>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     SIDEBAR OVERLAY (mobile)
+════════════════════════════════════════════════ -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="fecharSidebar()"></div>
+
+<!-- ════════════════════════════════════════════════
+     APP SHELL
+════════════════════════════════════════════════ -->
+<div id="tela-app" class="tela ativa">
+
+  <!-- ── SIDEBAR ──────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header" onclick="Auth.sairParaLanding()" style="cursor:pointer" title="Voltar à página inicial">
+      <div class="sidebar-logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 21C12 21 3 14.5 3 8.5C3 5.42 5.42 3 8.5 3C10.07 3 11.5 3.72 12 4.5C12.5 3.72 13.93 3 15.5 3C18.58 3 21 5.42 21 8.5C21 14.5 12 21 12 21Z" fill="white"/>
+        </svg>
+      </div>
+      <div>
+        <div class="sidebar-brand">Planner<span>Duo</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-user" id="sidebar-user-info">
+      <div class="sidebar-avatar" id="sidebar-avatar">?</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name" id="sidebar-user-name">Carregando...</div>
+        <div class="sidebar-user-status">Online</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section-label">Principal</div>
+    <nav class="sidebar-nav">
+      <a class="nav-item ativo" data-alvo="dashboard">
+        <span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span>
+        Visão Geral
+      </a>
+      <a class="nav-item" data-alvo="financas">
+        <span class="nav-icon"><i class="fa-solid fa-coins"></i></span>
+        Finanças
+        <span class="nav-badge" id="badge-financas" style="display:none">0</span>
+      </a>
+      <a class="nav-item" data-alvo="viagens">
+        <span class="nav-icon"><i class="fa-solid fa-plane-departure"></i></span>
+        Viagens
+      </a>
+      <a class="nav-item" data-alvo="metas">
+        <span class="nav-icon"><i class="fa-solid fa-bullseye"></i></span>
+        Metas &amp; Sonhos
+      </a>
+      <a class="nav-item" data-alvo="checklist">
+        <span class="nav-icon"><i class="fa-solid fa-list-check"></i></span>
+        Checklist de Viagem
+      </a>
+    </nav>
+
+    <div class="sidebar-section-label">Configurações</div>
+    <nav class="sidebar-nav" style="padding-bottom:0">
+      <a class="nav-item" data-alvo="relatorios">
+        <span class="nav-icon"><i class="fa-solid fa-file-chart-column"></i></span>
+        Relatórios
+      </a>
+      <a class="nav-item" onclick="Convites.abrirGerar()" style="cursor:pointer">
+        <span class="nav-icon"><i class="fa-solid fa-user-plus"></i></span>
+        Convidar parceiro(a)
+      </a>
+      <a class="nav-item" onclick="Convites.abrirAceitar()" style="cursor:pointer">
+        <span class="nav-icon"><i class="fa-solid fa-right-to-bracket"></i></span>
+        Entrar com código
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-sidebar-action" onclick="toggleTema()" data-tip="Alternar tema" id="btn-tema">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+      <button class="btn-sidebar-action" onclick="Auth.logout()" data-tip="Sair">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ─────────────────────────────────────── -->
+  <div class="main-content">
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+      <button class="btn-icon" onclick="abrirSidebar()">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <div class="mobile-brand">Planner<span>Duo</span></div>
+      <button class="btn-icon" onclick="toggleTema()">
+        <i class="fa-solid fa-moon" id="mobile-tema-icon"></i>
+      </button>
+    </div>
+
+    <!-- ══════════════════════════════════════════════
+         VIEW: DASHBOARD
+    ══════════════════════════════════════════════ -->
+    <section id="dashboard" class="view ativa">
+      <div class="dashboard-welcome" id="welcome-banner">
+        <div class="welcome-hearts" style="margin-bottom:8px">🩷</div>
+        <h2 id="welcome-msg">Olá, casal!</h2>
+        <p id="welcome-sub">Aqui está o resumo financeiro e de viagens de vocês.</p>
+      </div>
+
+      <!-- Panorama do Casal -->
+      <div class="card mb-24" style="padding:22px">
+        <div class="chart-title mb-16"><i class="fa-solid fa-compass"></i> Panorama do Casal</div>
+        <div id="panorama-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px"></div>
+      </div>
+
+      <!-- Stats Row 1 -->
+      <div class="stat-grid">
+        <div class="stat-card card blue">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-plane-departure"></i></div>
+          <div class="stat-label">Próxima Viagem</div>
+          <div class="stat-value" id="stat-proxima-viagem" style="font-size:1.1rem">—</div>
+          <div class="stat-delta neu" id="stat-proxima-delta">nenhuma planejada</div>
+        </div>
+        <div class="stat-card card rose">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-arrow-trend-down"></i></div>
+          <div class="stat-label">Despesas do Mês</div>
+          <div class="stat-value" id="stat-despesas">R$ 0</div>
+          <div class="stat-delta" id="stat-despesas-delta">—</div>
+        </div>
+        <div class="stat-card card emerald">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          <div class="stat-label">Receitas do Mês</div>
+          <div class="stat-value" id="stat-receitas">R$ 0</div>
+          <div class="stat-delta neu" id="stat-receitas-delta">—</div>
+        </div>
+        <div class="stat-card card purple">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-piggy-bank"></i></div>
+          <div class="stat-label">Saldo do Mês</div>
+          <div class="stat-value" id="stat-saldo">R$ 0</div>
+          <div class="stat-delta" id="stat-saldo-delta">—</div>
+        </div>
+        <div class="stat-card card amber">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-bullseye"></i></div>
+          <div class="stat-label">Metas Ativas</div>
+          <div class="stat-value" id="stat-metas">0</div>
+          <div class="stat-delta neu" id="stat-metas-delta">—</div>
+        </div>
+        <div class="stat-card card orange">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-handshake"></i></div>
+          <div class="stat-label">Acerto de Contas</div>
+          <div class="stat-value" id="stat-acerto" style="font-size:1rem">Quite!</div>
+          <div class="stat-delta" id="stat-acerto-delta">—</div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="charts-grid">
+        <div class="card" style="padding:22px">
+          <div class="chart-title"><i class="fa-solid fa-chart-line"></i> Fluxo de Caixa — Últimos 6 meses</div>
+          <div style="position:relative;height:240px">
+            <canvas id="chart-fluxo"></canvas>
+          </div>
+        </div>
+        <div class="card" style="padding:22px">
+          <div class="chart-title"><i class="fa-solid fa-chart-pie"></i> Despesas por Categoria</div>
+          <div style="position:relative;height:240px">
+            <canvas id="chart-categorias"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acerto de Contas Visual -->
+      <div class="split-vis" id="split-visual">
+        <div class="split-person">
+          <div class="split-avatar" id="split-av1" style="background:linear-gradient(135deg,#2563eb,#4f46e5)">?</div>
+          <div class="split-name" id="split-nome1">Pessoa 1</div>
+          <div class="split-amount" id="split-valor1">R$ 0</div>
+          <div class="split-pct" id="split-pct1">0% do total</div>
+        </div>
+        <div class="split-vs">
+          <div class="split-vs-icon"><i class="fa-solid fa-right-left"></i></div>
+        </div>
+        <div class="split-person">
+          <div class="split-avatar" id="split-av2" style="background:linear-gradient(135deg,#f97316,#f43f5e)">?</div>
+          <div class="split-name" id="split-nome2">Pessoa 2</div>
+          <div class="split-amount" id="split-valor2">R$ 0</div>
+          <div class="split-pct" id="split-pct2">0% do total</div>
+        </div>
+      </div>
+      <div class="split-result quite" id="split-resultado">✓ Tudo quite entre vocês!</div>
+
+      <!-- Próximas Viagens Preview -->
+      <div class="card mt-24">
+        <div class="flex-between mb-16">
+          <div class="chart-title" style="margin-bottom:0"><i class="fa-solid fa-plane"></i> Viagens Planejadas</div>
+          <button class="btn btn-ghost btn-sm" onclick="navegarPara('viagens')">Ver todas <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+        <div id="dash-viagens-preview"></div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════
+         VIEW: FINANÇAS
+    ══════════════════════════════════════════════ -->
+    <section id="financas" class="view">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title">Finanças do Casal 💰</h2>
+          <p class="view-subtitle" id="finance-month-label">Gerenciamento financeiro compartilhado</p>
+        </div>
+        <div class="flex gap-8" style="flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="Exportacao.gerarCSV()">
+            <i class="fa-solid fa-file-csv"></i> Exportar CSV
+          </button>
+          <button class="btn btn-primary" onclick="UI.abrirModal('modal-financa')">
+            <i class="fa-solid fa-plus"></i> Nova Transação
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumo do mês -->
+      <div class="balance-bar mb-24">
+        <div class="balance-item">
+          <div class="balance-label">Receitas do Mês</div>
+          <div class="balance-value receita" id="fin-total-receitas">R$ 0,00</div>
+        </div>
+        <div class="balance-item">
+          <div class="balance-label">Despesas do Mês</div>
+          <div class="balance-value despesa" id="fin-total-despesas">R$ 0,00</div>
+        </div>
+        <div class="balance-item">
+          <div class="balance-label">Saldo</div>
+          <div class="balance-value saldo" id="fin-saldo">R$ 0,00</div>
+        </div>
+      </div>
+
+      <!-- Chart de Despesas por Pessoa -->
+      <div class="charts-grid mb-24">
+        <div class="card" style="padding:22px">
+          <div class="chart-title"><i class="fa-solid fa-chart-bar"></i> Despesas por Responsável (mês)</div>
+          <div style="position:relative;height:220px">
+            <canvas id="chart-responsavel"></canvas>
+          </div>
+        </div>
+        <div class="card" style="padding:22px">
+          <div class="chart-title"><i class="fa-solid fa-chart-pie"></i> Distribuição por Categoria</div>
+          <div style="position:relative;height:220px">
+            <canvas id="chart-cat-fin"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Orçamentos mensais por categoria -->
+      <div class="card mb-24" style="padding:22px">
+        <div class="flex-between mb-16" style="flex-wrap:wrap;gap:10px">
+          <div class="chart-title" style="margin:0"><i class="fa-solid fa-gauge-high"></i> Orçamentos Mensais</div>
+          <button class="btn btn-ghost btn-sm" onclick="UI.abrirModal('modal-orcamento')">
+            <i class="fa-solid fa-plus"></i> Definir Limite
+          </button>
+        </div>
+        <div id="orcamentos-container"></div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="finance-filters">
+        <button class="filter-tab ativo" data-filtro="todos">Todos</button>
+        <button class="filter-tab" data-filtro="despesa">Despesas</button>
+        <button class="filter-tab" data-filtro="receita">Receitas</button>
+        <button class="filter-tab" data-filtro="transporte">🚗 Transporte</button>
+        <button class="filter-tab" data-filtro="alimentacao">🍔 Alimentação</button>
+        <button class="filter-tab" data-filtro="moradia">🏠 Moradia</button>
+        <button class="filter-tab" data-filtro="lazer">🎟️ Lazer</button>
+        <button class="filter-tab" data-filtro="saude">💊 Saúde</button>
+        <button class="filter-tab" data-filtro="viagem">✈️ Viagem</button>
+
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="input-wrap" style="width:180px">
+            <i class="fa-solid fa-magnifying-glass input-icon"></i>
+            <input type="text" id="fin-busca" placeholder="Buscar..." style="font-size:.8rem;padding:8px 8px 8px 34px">
+          </div>
+          <select id="fin-mes" style="font-size:.8rem;padding:8px 12px;width:auto">
+            <option value="">Todos os meses</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Responsável</th>
+              <th>Tipo</th>
+              <th>Valor</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-financas">
+            <tr><td colspan="7">
+              <div class="empty-state">
+                <div class="empty-state-icon">💳</div>
+                <h3>Sem transações ainda</h3>
+                <p>Adicione sua primeira movimentação financeira</p>
+              </div>
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════
+         VIEW: VIAGENS
+    ══════════════════════════════════════════════ -->
+    <section id="viagens" class="view">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title">Central de Viagens ✈️</h2>
+          <p class="view-subtitle">Roteiros, orçamentos e busca de passagens</p>
+        </div>
+        <button class="btn btn-primary" onclick="UI.abrirModal('modal-viagem')">
+          <i class="fa-solid fa-plus"></i> Nova Viagem
+        </button>
+      </div>
+
+      <!-- Busca Hub -->
+      <div class="search-hub">
+        <div class="search-hub-title">
+          <i class="fa-solid fa-magnifying-glass-location"></i>
+          Busca Inteligente de Viagem
+        </div>
+        <p class="search-hub-subtitle">Preencha os dados e escolha a plataforma para buscar</p>
+
+        <div class="search-hub-fields">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Origem</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-location-dot input-icon" style="color:rgba(255,255,255,.4)"></i>
+              <input type="text" id="busca-origem" value="Belo Horizonte" placeholder="Sua cidade">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Destino</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-map-pin input-icon" style="color:rgba(255,255,255,.4)"></i>
+              <input type="text" id="busca-destino" placeholder="Para onde? Ex: Paris">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Ida</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-calendar input-icon" style="color:rgba(255,255,255,.4)"></i>
+              <input type="date" id="busca-data-ida">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Volta</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-calendar input-icon" style="color:rgba(255,255,255,.4)"></i>
+              <input type="date" id="busca-data-volta">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Viajantes</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-users input-icon" style="color:rgba(255,255,255,.4)"></i>
+              <select id="busca-passageiros">
+                <option value="2" selected>2 — Casal</option>
+                <option value="1">1 pessoa</option>
+                <option value="3">3 pessoas</option>
+                <option value="4">4 pessoas</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="platform-grid">
+          <button class="platform-btn pb-flights"  onclick="ServicoBusca.redirecionar('googleflights')"><span class="platform-icon">✈️</span>Google Flights</button>
+          <button class="platform-btn pb-azul"     onclick="ServicoBusca.redirecionar('azul')"><span class="platform-icon">💙</span>Azul</button>
+          <button class="platform-btn pb-gol"      onclick="ServicoBusca.redirecionar('gol')"><span class="platform-icon">🟠</span>GOL</button>
+          <button class="platform-btn pb-latam"    onclick="ServicoBusca.redirecionar('latam')"><span class="platform-icon">❤️</span>LATAM</button>
+          <button class="platform-btn pb-kayak"     onclick="ServicoBusca.redirecionar('kayak')"><span class="platform-icon">🧭</span>Kayak</button>
+          <button class="platform-btn pb-skyscanner" onclick="ServicoBusca.redirecionar('skyscanner')"><span class="platform-icon">🔭</span>Skyscanner</button>
+          <button class="platform-btn pb-airbnb"   onclick="ServicoBusca.redirecionar('airbnb')"><span class="platform-icon">🏠</span>Airbnb</button>
+          <button class="platform-btn pb-booking"  onclick="ServicoBusca.redirecionar('booking')"><span class="platform-icon">🏨</span>Booking</button>
+          <button class="platform-btn pb-buser"    onclick="ServicoBusca.redirecionar('buser')"><span class="platform-icon">🚌</span>Buser</button>
+          <button class="platform-btn pb-clickbus" onclick="ServicoBusca.redirecionar('clickbus')"><span class="platform-icon">🎫</span>ClickBus</button>
+          <button class="platform-btn pb-maps"     onclick="ServicoBusca.redirecionar('maps')"><span class="platform-icon">🗺️</span>Google Maps</button>
+          <button class="platform-btn pb-tripadv"  onclick="ServicoBusca.redirecionar('tripadvisor')"><span class="platform-icon">🦉</span>TripAdvisor</button>
+        </div>
+
+        <!-- Histórico de buscas -->
+        <div id="busca-historico"></div>
+      </div>
+
+      <!-- Filtro e Cards -->
+      <div class="flex-between mb-16" style="flex-wrap:wrap;gap:10px">
+        <div class="tab-nav" style="margin:0">
+          <button class="tab-btn ativo" data-filtro-viagem="todas">Todas</button>
+          <button class="tab-btn" data-filtro-viagem="futura">Futuras</button>
+          <button class="tab-btn" data-filtro-viagem="andamento">Em andamento</button>
+          <button class="tab-btn" data-filtro-viagem="concluida">Concluídas</button>
+        </div>
+        <div class="input-wrap" style="width:200px">
+          <i class="fa-solid fa-magnifying-glass input-icon"></i>
+          <input type="text" id="viagem-busca" placeholder="Buscar destino..." style="font-size:.8rem;padding:8px 8px 8px 34px">
+        </div>
+      </div>
+
+      <div class="trip-grid" id="trip-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-state-icon">🗺️</div>
+          <h3>Nenhuma viagem planejada</h3>
+          <p>Que tal planejar a próxima aventura do casal?</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════
+         VIEW: METAS
+    ══════════════════════════════════════════════ -->
+    <section id="metas" class="view">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title">Metas &amp; Sonhos 🎯</h2>
+          <p class="view-subtitle">Acompanhe o progresso financeiro de cada sonho do casal</p>
+        </div>
+        <button class="btn btn-primary" onclick="UI.abrirModal('modal-meta')">
+          <i class="fa-solid fa-plus"></i> Nova Meta
+        </button>
+      </div>
+
+      <!-- Resumo de metas -->
+      <div class="stat-grid mb-24" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="stat-card card blue">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-bullseye"></i></div>
+          <div class="stat-label">Total de Metas</div>
+          <div class="stat-value" id="meta-total">0</div>
+        </div>
+        <div class="stat-card card emerald">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-check-circle"></i></div>
+          <div class="stat-label">Concluídas</div>
+          <div class="stat-value" id="meta-concluidas">0</div>
+        </div>
+        <div class="stat-card card amber">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-clock"></i></div>
+          <div class="stat-label">Em Progresso</div>
+          <div class="stat-value" id="meta-em-progresso">0</div>
+        </div>
+        <div class="stat-card card purple">
+          <div class="stat-icon-wrap"><i class="fa-solid fa-piggy-bank"></i></div>
+          <div class="stat-label">Total Guardado</div>
+          <div class="stat-value" id="meta-guardado" style="font-size:1rem">R$ 0</div>
+        </div>
+      </div>
+
+      <div class="goals-grid" id="goals-grid">
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-state-icon">🌟</div>
+          <h3>Nenhuma meta ainda</h3>
+          <p>Crie metas financeiras para transformar sonhos em realidade!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════
+         VIEW: CHECKLIST DE VIAGEM
+    ══════════════════════════════════════════════ -->
+    <section id="checklist" class="view">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title">Checklist de Viagem ✅</h2>
+          <p class="view-subtitle">Nunca mais esqueça nada importante na sua viagem</p>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-ghost btn-sm" onclick="Checklist.marcarTodos()">
+            <i class="fa-solid fa-check-double"></i> Marcar todos
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="Checklist.desmarcarTodos()">
+            <i class="fa-regular fa-square"></i> Desmarcar todos
+          </button>
+          <button class="btn btn-primary" onclick="UI.abrirModal('modal-checklist-item')">
+            <i class="fa-solid fa-plus"></i> Adicionar item
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress geral -->
+      <div class="card mb-24" style="padding:22px">
+        <div class="flex-between mb-8">
+          <span style="font-weight:700;font-size:.9rem">Progresso do checklist</span>
+          <span id="check-progresso-txt" style="font-weight:700;color:var(--brand-blue)">0 / 0 itens</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bar" id="check-progress-bar" style="width:0%;background:var(--grad-success)"></div>
+        </div>
+      </div>
+
+      <!-- Tabs por categoria -->
+      <div class="tab-nav mb-24">
+        <button class="tab-btn ativo" data-check-cat="todos"><i class="fa-solid fa-list"></i> Todos</button>
+        <button class="tab-btn" data-check-cat="documentos"><i class="fa-solid fa-passport"></i> Documentos</button>
+        <button class="tab-btn" data-check-cat="roupas"><i class="fa-solid fa-shirt"></i> Roupas</button>
+        <button class="tab-btn" data-check-cat="higiene"><i class="fa-solid fa-soap"></i> Higiene</button>
+        <button class="tab-btn" data-check-cat="tecnologia"><i class="fa-solid fa-laptop"></i> Tecnologia</button>
+        <button class="tab-btn" data-check-cat="saude"><i class="fa-solid fa-kit-medical"></i> Saúde</button>
+        <button class="tab-btn" data-check-cat="outros"><i class="fa-solid fa-ellipsis"></i> Outros</button>
+      </div>
+
+      <div class="checklist-wrap" id="checklist-wrap">
+        <div class="empty-state">
+          <div class="empty-state-icon">📋</div>
+          <h3>Checklist vazio</h3>
+          <p>Adicione itens ou use os templates prontos abaixo</p>
+        </div>
+      </div>
+
+      <!-- Templates -->
+      <div class="card mt-24" style="padding:22px">
+        <div class="chart-title mb-16"><i class="fa-solid fa-wand-magic-sparkles"></i> Templates Prontos</div>
+        <div class="flex gap-8" style="flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="Checklist.aplicarTemplate('praia')">🏖️ Viagem de Praia</button>
+          <button class="btn btn-ghost btn-sm" onclick="Checklist.aplicarTemplate('internacional')">🌍 Viagem Internacional</button>
+          <button class="btn btn-ghost btn-sm" onclick="Checklist.aplicarTemplate('mochilao')">🎒 Mochilão</button>
+          <button class="btn btn-ghost btn-sm" onclick="Checklist.aplicarTemplate('cruzeiro')">🛳️ Cruzeiro</button>
+          <button class="btn btn-danger btn-sm" onclick="Checklist.limpar()">
+            <i class="fa-solid fa-trash"></i> Limpar tudo
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════
+         VIEW: RELATÓRIOS
+    ══════════════════════════════════════════════ -->
+    <section id="relatorios" class="view">
+      <div class="view-header">
+        <div>
+          <h2 class="view-title">Relatórios 📊</h2>
+          <p class="view-subtitle">Análises detalhadas das finanças do casal</p>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn btn-ghost btn-sm" onclick="Exportacao.gerarCSV()">
+            <i class="fa-solid fa-file-csv"></i> Exportar CSV
+          </button>
+          <button class="btn btn-ghost btn-sm" onclick="Exportacao.gerarPDF()">
+            <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtro de período -->
+      <div class="card mb-24" style="padding:18px 22px">
+        <div class="flex gap-12 flex-wrap" style="align-items:center">
+          <span style="font-weight:600;font-size:.85rem;color:var(--text-secondary)"><i class="fa-solid fa-filter"></i> Filtrar por período:</span>
+          <select id="rel-periodo" onchange="Relatorios.atualizar()" style="width:auto;font-size:.82rem;padding:7px 12px">
+            <option value="3">Últimos 3 meses</option>
+            <option value="6" selected>Últimos 6 meses</option>
+            <option value="12">Últimos 12 meses</option>
+          </select>
+          <select id="rel-pessoa" onchange="Relatorios.atualizar()" style="width:auto;font-size:.82rem;padding:7px 12px">
+            <option value="todos">Ambos</option>
+            <option value="p1" id="rel-p1-opt">Pessoa 1</option>
+            <option value="p2" id="rel-p2-opt">Pessoa 2</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="charts-grid mb-24">
+        <div class="card" style="padding:22px">
+          <div class="chart-title"><i class="fa-solid fa-chart-line"></i> Evolução de Despesas</div>
+          <div style="position:relative;height:250px">
+            <canvas id="chart-rel-evolucao"></canvas>
+          </div>
+        </div>
+        <div class="card" style="padding:22px">
+          <div class="chart-title"><i class="fa-solid fa-chart-pie"></i> Categorias no Período</div>
+          <div style="position:relative;height:250px">
+            <canvas id="chart-rel-categorias"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:22px">
+        <div class="chart-title mb-16"><i class="fa-solid fa-table"></i> Resumo por Mês</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mês</th>
+                <th>Receitas</th>
+                <th>Despesas</th>
+                <th>Saldo</th>
+                <th><span id="rel-col-p1">Pessoa 1</span></th>
+                <th><span id="rel-col-p2">Pessoa 2</span></th>
+              </tr>
+            </thead>
+            <tbody id="rel-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /.main-content -->
+</div><!-- /#tela-app -->
+
+
+<!-- ══════════════════════════════════════════════════
+     MODAIS
+══════════════════════════════════════════════════ -->
+
+<!-- ── Modal: Nova Transação ────────────────────── -->
+<div class="modal-overlay" id="modal-financa">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Nova Transação 💳</div>
+        <div class="modal-subtitle">Registre uma receita ou despesa</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-financa')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="form-financa">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-tag input-icon"></i>
+              <select id="fin-tipo">
+                <option value="despesa">💸 Despesa</option>
+                <option value="receita">💰 Receita</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Responsável</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-user input-icon"></i>
+              <select id="fin-resp">
+                <option id="fin-resp-p1">Pessoa 1</option>
+                <option id="fin-resp-p2">Pessoa 2</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-pen input-icon"></i>
+            <input type="text" id="fin-desc" placeholder="Ex: Almoço no restaurante" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Valor (R$)</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+              <input type="number" id="fin-valor" placeholder="0,00" min="0.01" step="0.01" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-calendar input-icon"></i>
+              <input type="date" id="fin-data" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Categoria</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-folder input-icon"></i>
+            <select id="fin-categoria">
+              <option value="alimentacao">🍔 Alimentação</option>
+              <option value="transporte">🚗 Transporte</option>
+              <option value="moradia">🏠 Moradia</option>
+              <option value="lazer">🎟️ Lazer</option>
+              <option value="saude">💊 Saúde</option>
+              <option value="viagem">✈️ Viagem</option>
+              <option value="educacao">📚 Educação</option>
+              <option value="vestuario">👗 Vestuário</option>
+              <option value="salario">💼 Salário</option>
+              <option value="investimento">📈 Investimento</option>
+              <option value="outros">🏷️ Outros</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Vincular à Viagem (opcional)</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-plane input-icon"></i>
+            <select id="fin-viagem">
+              <option value="">Nenhuma</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Recorrência</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-repeat input-icon"></i>
+              <select id="fin-recorrente">
+                <option value="">Não recorrente</option>
+                <option value="mensal">🔁 Mensal</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Parcelas</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-credit-card input-icon"></i>
+              <input type="number" id="fin-parcelas" value="1" min="1" step="1">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observação (opcional)</label>
+          <textarea id="fin-obs" placeholder="Detalhes adicionais..." rows="2"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-financa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Controladores.adicionarFinanca()">
+        <i class="fa-solid fa-check"></i> Salvar Transação
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Nova Viagem ────────────────────────── -->
+<div class="modal-overlay" id="modal-viagem">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Nova Viagem ✈️</div>
+        <div class="modal-subtitle">Planeje os detalhes da próxima aventura</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-viagem')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="form-viagem">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Destino</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-map-pin input-icon"></i>
+              <input type="text" id="v-destino" placeholder="Ex: Paris, França 🇫🇷" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emoji do Destino</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-face-smile input-icon"></i>
+              <input type="text" id="v-emoji" placeholder="🏝️ 🗼 🏔️ 🌊" maxlength="4">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data de Ida</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-calendar input-icon"></i>
+              <input type="date" id="v-ida" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data de Volta</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-calendar input-icon"></i>
+              <input type="date" id="v-volta" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Orçamento Total (R$)</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+              <input type="number" id="v-orcamento" placeholder="5000" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo de Viagem</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-tag input-icon"></i>
+              <select id="v-tipo">
+                <option value="praia">🏖️ Praia</option>
+                <option value="cidade">🏙️ City Trip</option>
+                <option value="natureza">🌿 Natureza / Ecoturismo</option>
+                <option value="internacional">🌍 Internacional</option>
+                <option value="cruzeiro">🛳️ Cruzeiro</option>
+                <option value="mochilao">🎒 Mochilão</option>
+                <option value="outros">✈️ Outros</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Link da Reserva / Roteiro (opcional)</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-link input-icon"></i>
+            <input type="url" id="v-link" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Notas / Roteiro (opcional)</label>
+          <textarea id="v-notas" placeholder="Hotéis, pontos turísticos, restaurantes recomendados..." rows="3"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-viagem')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Controladores.adicionarViagem()">
+        <i class="fa-solid fa-plane"></i> Salvar Viagem
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Detalhe da Viagem ──────────────────── -->
+<div class="modal-overlay" id="modal-viagem-detalhe">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="detalhe-titulo">Detalhes da Viagem</div>
+        <div class="modal-subtitle" id="detalhe-datas">—</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-viagem-detalhe')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" id="modal-viagem-detalhe-body"></div>
+  </div>
+</div>
+
+<!-- ── Modal: Nova Meta ──────────────────────────── -->
+<div class="modal-overlay" id="modal-meta">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Nova Meta 🎯</div>
+        <div class="modal-subtitle">Defina um objetivo financeiro do casal</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-meta')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <form id="form-meta">
+        <div class="form-group">
+          <label class="form-label">Título da Meta</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-star input-icon"></i>
+            <input type="text" id="meta-titulo" placeholder="Ex: Fundo de emergência, Viagem para Europa..." required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ícone / Emoji</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-face-smile input-icon"></i>
+            <input type="text" id="meta-emoji" placeholder="🏠 ✈️ 💍 🚗 📱" maxlength="4" value="🎯">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Categoria</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-folder input-icon"></i>
+            <select id="meta-cat">
+              <option value="viagem">✈️ Viagem</option>
+              <option value="emergencia">🛡️ Fundo de Emergência</option>
+              <option value="imovel">🏠 Imóvel</option>
+              <option value="veiculo">🚗 Veículo</option>
+              <option value="educacao">📚 Educação</option>
+              <option value="casamento">💍 Casamento</option>
+              <option value="investimento">📈 Investimento</option>
+              <option value="outros">🎯 Outros</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Valor Alvo (R$)</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+              <input type="number" id="meta-alvo" placeholder="10000" min="1" step="0.01" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor Atual (R$)</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-piggy-bank input-icon"></i>
+              <input type="number" id="meta-atual" placeholder="0" min="0" step="0.01" value="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Data Limite</label>
+          <div class="input-wrap">
+            <i class="fa-regular fa-calendar input-icon"></i>
+            <input type="date" id="meta-prazo">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Descrição (opcional)</label>
+          <textarea id="meta-desc" placeholder="Detalhes sobre esta meta..." rows="2"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-meta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Controladores.adicionarMeta()">
+        <i class="fa-solid fa-star"></i> Criar Meta
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Adicionar ao Cofrinho da Meta ──────── -->
+<div class="modal-overlay" id="modal-meta-deposito">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Adicionar ao Cofrinho 🐷</div>
+        <div class="modal-subtitle" id="deposito-meta-nome">Meta</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-meta-deposito')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Valor a guardar (R$)</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+          <input type="number" id="deposito-valor" placeholder="100,00" min="0.01" step="0.01">
+        </div>
+      </div>
+      <input type="hidden" id="deposito-meta-id">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-meta-deposito')">Cancelar</button>
+      <button class="btn btn-success" onclick="Controladores.depositarMeta()">
+        <i class="fa-solid fa-piggy-bank"></i> Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Cofrinho da Viagem ─────────────────── -->
+<div class="modal-overlay" id="modal-viagem-cofrinho">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Cofrinho da Viagem 🐷</div>
+        <div class="modal-subtitle" id="cofrinho-viagem-nome">Viagem</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-viagem-cofrinho')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Valor a guardar (R$)</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+          <input type="number" id="cofrinho-valor" placeholder="100,00" min="0.01" step="0.01">
+        </div>
+      </div>
+      <input type="hidden" id="cofrinho-viagem-id">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-viagem-cofrinho')">Cancelar</button>
+      <button class="btn btn-success" onclick="Controladores.guardarViagem()">
+        <i class="fa-solid fa-piggy-bank"></i> Guardar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Orçamento por Categoria ────────────── -->
+<div class="modal-overlay" id="modal-orcamento">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Limite Mensal 🎯</div>
+        <div class="modal-subtitle">Defina um teto de gastos por categoria</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-orcamento')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-folder input-icon"></i>
+          <select id="orc-categoria">
+            <option value="alimentacao">🍔 Alimentação</option>
+            <option value="transporte">🚗 Transporte</option>
+            <option value="moradia">🏠 Moradia</option>
+            <option value="lazer">🎟️ Lazer</option>
+            <option value="saude">💊 Saúde</option>
+            <option value="viagem">✈️ Viagem</option>
+            <option value="educacao">📚 Educação</option>
+            <option value="vestuario">👗 Vestuário</option>
+            <option value="salario">💼 Salário</option>
+            <option value="investimento">📈 Investimento</option>
+            <option value="outros">🏷️ Outros</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Limite mensal (R$)</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+          <input type="number" id="orc-valor" placeholder="1000,00" min="0" step="0.01">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-orcamento')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Orcamentos.definir()">
+        <i class="fa-solid fa-check"></i> Definir Limite
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Item do Checklist ──────────────────── -->
+<div class="modal-overlay" id="modal-checklist-item">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Adicionar Item ✅</div>
+        <div class="modal-subtitle">Adicione ao checklist de viagem</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-checklist-item')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Item</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-list-check input-icon"></i>
+          <input type="text" id="check-item-texto" placeholder="Ex: Passaporte, protetor solar..." required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-folder input-icon"></i>
+          <select id="check-item-cat">
+            <option value="documentos">📄 Documentos</option>
+            <option value="roupas">👗 Roupas</option>
+            <option value="higiene">🧼 Higiene</option>
+            <option value="tecnologia">💻 Tecnologia</option>
+            <option value="saude">💊 Saúde</option>
+            <option value="outros">📦 Outros</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-checklist-item')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Checklist.adicionar()">
+        <i class="fa-solid fa-plus"></i> Adicionar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Editar Transação ───────────────────── -->
+<div class="modal-overlay" id="modal-editar-financa">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Editar Transação ✏️</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-editar-financa')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-fin-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-tag input-icon"></i>
+            <select id="edit-fin-tipo">
+              <option value="despesa">💸 Despesa</option>
+              <option value="receita">💰 Receita</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsável</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-user input-icon"></i>
+            <select id="edit-fin-resp">
+              <option id="edit-fin-resp-p1">Pessoa 1</option>
+              <option id="edit-fin-resp-p2">Pessoa 2</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descrição</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-pen input-icon"></i>
+          <input type="text" id="edit-fin-desc" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Valor (R$)</label>
+          <div class="input-wrap">
+            <i class="fa-solid fa-brazilian-real-sign input-icon"></i>
+            <input type="number" id="edit-fin-valor" min="0.01" step="0.01" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data</label>
+          <div class="input-wrap">
+            <i class="fa-regular fa-calendar input-icon"></i>
+            <input type="date" id="edit-fin-data" required>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-folder input-icon"></i>
+          <select id="edit-fin-categoria">
+            <option value="alimentacao">🍔 Alimentação</option>
+            <option value="transporte">🚗 Transporte</option>
+            <option value="moradia">🏠 Moradia</option>
+            <option value="lazer">🎟️ Lazer</option>
+            <option value="saude">💊 Saúde</option>
+            <option value="viagem">✈️ Viagem</option>
+            <option value="educacao">📚 Educação</option>
+            <option value="vestuario">👗 Vestuário</option>
+            <option value="salario">💼 Salário</option>
+            <option value="investimento">📈 Investimento</option>
+            <option value="outros">🏷️ Outros</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vincular à Viagem (opcional)</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-plane input-icon"></i>
+          <select id="edit-fin-viagem">
+            <option value="">Nenhuma</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-editar-financa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Controladores.salvarEdicaoFinanca()">
+        <i class="fa-solid fa-check"></i> Salvar Alterações
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Gerar Convite ──────────────────────── -->
+<div class="modal-overlay" id="modal-convite-gerar">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Convidar parceiro(a) 💑</div>
+        <div class="modal-subtitle">Gere um código e compartilhe com quem vai dividir o espaço</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-convite-gerar')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <button class="btn btn-primary" style="width:100%" onclick="Convites.criar()">
+        <i class="fa-solid fa-key"></i> Gerar código
+      </button>
+      <div id="convite-codigo-gerado" style="text-align:center;font-family:monospace;font-size:2rem;letter-spacing:0.3rem;font-weight:700;margin:1.25rem 0 0.25rem">—</div>
+      <div id="convite-validade" style="text-align:center;font-size:0.8rem;color:var(--text-muted)"></div>
+      <button class="btn btn-ghost" style="width:100%;margin-top:1rem" onclick="navigator.clipboard.writeText(document.getElementById('convite-codigo-gerado').textContent); UI.toast('Código copiado!','','sucesso')">
+        <i class="fa-solid fa-copy"></i> Copiar
+      </button>
+      <p style="font-size:0.8rem;color:var(--text-muted);margin-top:1rem;line-height:1.5">
+        O código expira em 72 horas. Seu parceiro(a) deve entrar com Google e usar "Entrar com código".
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-convite-gerar')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Aceitar Convite ────────────────────── -->
+<div class="modal-overlay" id="modal-convite-aceitar">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Entrar em um espaço 🔑</div>
+        <div class="modal-subtitle">Digite o código que seu parceiro(a) compartilhou</div>
+      </div>
+      <button class="modal-close" onclick="UI.fecharModal('modal-convite-aceitar')"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Código do convite</label>
+        <div class="input-wrap">
+          <i class="fa-solid fa-key input-icon"></i>
+          <input type="text" id="convite-codigo-input" maxlength="8" placeholder="Ex: A1B2C3D4" style="text-transform:uppercase;letter-spacing:0.25rem;text-align:center;font-size:1.4rem;font-family:monospace">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="UI.fecharModal('modal-convite-aceitar')">Cancelar</button>
+      <button class="btn btn-primary" onclick="Convites.aceitar(document.getElementById('convite-codigo-input').value)">
+        <i class="fa-solid fa-right-to-bracket"></i> Entrar no espaço
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="core.js"></script>
+<script src="app.js"></script>
+
+<script>
+  // Timeout de segurança: se o loader ainda estiver visível após 10s,
+  // provavelmente há um problema de rede ou autenticação — redireciona para login.
+  setTimeout(() => {
+    const loader = document.getElementById('loader-tela');
+    if (loader && loader.style.display !== 'none' && !loader.classList.contains('saindo')) {
+      const msg = document.getElementById('loader-msg');
+      if (msg) msg.innerHTML = 'Demorando mais que o esperado... <a href="auth.html" style="color:var(--brand-blue);font-weight:600">Ir para o login</a>';
+    }
+  }, 8000);
+</script>
+</body>
+</html>

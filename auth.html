@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entrar — PlannerDuo</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="auth-page">
+
+  <!-- ── Lado esquerdo: branding ─────────────────── -->
+  <div class="auth-left">
+    <div class="auth-left-orbs">
+      <div class="auth-orb auth-orb-1"></div>
+      <div class="auth-orb auth-orb-2"></div>
+      <div class="auth-orb auth-orb-3"></div>
+    </div>
+
+    <div class="auth-left-content">
+      <div class="auth-logo">
+        <div class="auth-logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 21C12 21 3 14.5 3 8.5C3 5.42 5.42 3 8.5 3C10.07 3 11.5 3.72 12 4.5C12.5 3.72 13.93 3 15.5 3C18.58 3 21 5.42 21 8.5C21 14.5 12 21 12 21Z" fill="white"/>
+          </svg>
+        </div>
+        <div class="auth-logo-text">Planner<span>Duo</span></div>
+      </div>
+
+      <div class="auth-tagline">
+        Planejem juntos,<br>
+        vivam <span>memórias</span><br>
+        inesquecíveis.
+      </div>
+
+      <p class="auth-desc">
+        Controle de finanças do casal, planejamento de viagens, metas compartilhadas e muito mais — tudo em um só lugar.
+      </p>
+
+      <div class="auth-features">
+        <div class="auth-feature">
+          <div class="auth-feature-icon" style="background:rgba(37,99,235,.2);color:#60a5fa">
+            <i class="fa-solid fa-coins"></i>
+          </div>
+          Controle financeiro compartilhado
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon" style="background:rgba(249,115,22,.2);color:#fb923c">
+            <i class="fa-solid fa-plane-departure"></i>
+          </div>
+          Planejamento de viagens completo
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon" style="background:rgba(16,185,129,.2);color:#34d399">
+            <i class="fa-solid fa-bullseye"></i>
+          </div>
+          Metas financeiras com progresso
+        </div>
+        <div class="auth-feature">
+          <div class="auth-feature-icon" style="background:rgba(124,58,237,.2);color:#a78bfa">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          Sync em tempo real na nuvem
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Lado direito: formulários ───────────────── -->
+  <div class="auth-right">
+    <div class="auth-form-wrap">
+
+      <!-- LOGIN -->
+      <div id="secao-login" class="auth-section ativa">
+        <div class="auth-form-title">Bem‑vindo de volta! 👋</div>
+        <p class="auth-form-sub" id="login-sub">Entre com sua conta para acessar o painel do casal.</p>
+
+        <form id="form-login" novalidate>
+          <div class="form-group">
+            <label class="form-label">E-mail</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-envelope input-icon"></i>
+              <input type="email" id="login-email" placeholder="seuemail@exemplo.com" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Senha</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="login-senha" placeholder="Sua senha" required>
+              <span class="password-toggle" onclick="togglePwd('login-senha', this)">
+                <i class="fa-regular fa-eye"></i>
+              </span>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;margin-bottom:20px;">
+            <a href="#" onclick="trocarSecao('reset')" style="font-size:.82rem;color:var(--brand-blue);font-weight:600;text-decoration:none;">
+              Esqueci minha senha
+            </a>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-login">
+            <i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar no PlannerDuo
+          </button>
+        </form>
+
+        <div class="auth-divider">ou</div>
+
+        <button class="btn btn-ghost btn-block" onclick="loginGoogle()">
+          <svg width="18" height="18" viewBox="0 0 24 24" style="flex-shrink:0">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+          Continuar com Google
+        </button>
+
+        <p class="auth-switch">
+          Primeiro acesso? <a href="#" onclick="trocarSecao('cadastro')">Criar conta do casal</a>
+          &nbsp;·&nbsp; <a href="#" onclick="trocarConta()" style="color:var(--text-muted);font-size:.8rem">Trocar conta</a>
+        </p>
+      </div>
+
+      <!-- CADASTRO -->
+      <div id="secao-cadastro" class="auth-section">
+        <div class="auth-form-title">Criar conta do casal 💑</div>
+        <p class="auth-form-sub">Vocês dois precisam criar contas separadas com seus próprios e-mails.</p>
+
+        <form id="form-cadastro" novalidate>
+          <div class="form-group">
+            <label class="form-label">Seu nome</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-user input-icon"></i>
+              <input type="text" id="cad-nome1" placeholder="Ex: seu nome" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nome do(a) parceiro(a)</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-heart input-icon"></i>
+              <input type="text" id="cad-nome2" placeholder="Ex: nome do parceiro(a)" required>
+            </div>
+            <p class="form-hint">Seu parceiro(a) deve criar a conta própria dele(a) depois.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Seu e-mail</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-envelope input-icon"></i>
+              <input type="email" id="cad-email" placeholder="seuemail@exemplo.com" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Senha</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="cad-senha" placeholder="Mínimo 6 caracteres" required>
+              <span class="password-toggle" onclick="togglePwd('cad-senha', this)">
+                <i class="fa-regular fa-eye"></i>
+              </span>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-cadastro">
+            <i class="fa-solid fa-heart"></i> Criar Minha Conta
+          </button>
+        </form>
+
+        <p class="auth-switch">
+          Já tem conta? <a href="#" onclick="trocarSecao('login')">Fazer login</a>
+        </p>
+      </div>
+
+      <!-- RESET DE SENHA -->
+      <div id="secao-reset" class="auth-section">
+        <div class="auth-form-title">Recuperar senha 🔑</div>
+        <p class="auth-form-sub">Informe o e-mail cadastrado e enviaremos um link de redefinição.</p>
+
+        <form id="form-reset" novalidate>
+          <div class="form-group">
+            <label class="form-label">E-mail cadastrado</label>
+            <div class="input-wrap">
+              <i class="fa-regular fa-envelope input-icon"></i>
+              <input type="email" id="reset-email" placeholder="seuemail@exemplo.com" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg">
+            <i class="fa-solid fa-paper-plane"></i> Enviar Link de Recuperação
+          </button>
+        </form>
+
+        <p class="auth-switch">
+          <a href="#" onclick="trocarSecao('login')"><i class="fa-solid fa-arrow-left"></i> Voltar ao login</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /.auth-page -->
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+<script>
+/* ═══════════════════════════════════════════════
+   AUTH PAGE — script independente (sem app.js)
+═══════════════════════════════════════════════ */
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyAywzg4yDP0p15RpnFwPc2Y2MGoT2U5l4M",
+  authDomain: "plannerduo.firebaseapp.com",
+  projectId: "plannerduo",
+  storageBucket: "plannerduo.firebasestorage.app",
+  messagingSenderId: "355035332668",
+  appId: "1:355035332668:web:9c91fb300c4b601dfc4339"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// SEGURANÇA: a sessão dura apenas enquanto a aba estiver aberta (SESSION),
+// e NUNCA entramos automaticamente — o usuário sempre digita e-mail e senha.
+auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(() => {});
+
+// Ao chegar na tela de login vindo da landing ou de outra aba, garantimos que
+// não há sessão residual: encerramos qualquer sessão antes de mostrar o formulário.
+// (Após um login bem-sucedido, o próprio handler de submit redireciona para app.html.)
+let _loginEmAndamento = false;
+auth.onAuthStateChanged((user) => {
+  // Não faz nada automático: a navegação para app.html só ocorre após
+  // o usuário submeter o formulário de login/cadastro com sucesso.
+});
+
+// ── Helpers UI ────────────────────────────────
+function trocarSecao(tipo) {
+  document.querySelectorAll('.auth-section').forEach(s => s.classList.remove('ativa'));
+  document.getElementById('secao-' + tipo).classList.add('ativa');
+}
+
+// Troca de conta: limpa o casalId e todo o cache local do casal anterior
+// antes de deslogar, evitando que dados de outro casal apareçam no login seguinte.
+function trocarConta() {
+  try {
+    localStorage.removeItem('pd-casalId');
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('pd-cache:'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+  auth.signOut();
+}
+
+function togglePwd(id, el) {
+  const input = document.getElementById(id);
+  const icon  = el.querySelector('i');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.replace('fa-eye', 'fa-eye-slash');
+  } else {
+    input.type = 'password';
+    icon.classList.replace('fa-eye-slash', 'fa-eye');
+  }
+}
+
+function toast(texto, tipo) {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const cores = { erro:'#f43f5e', sucesso:'#10b981', aviso:'#f59e0b', info:'#2563eb' };
+  const cor = cores[tipo] || cores.info;
+  const icone = tipo === 'erro' ? 'fa-circle-exclamation' : tipo === 'sucesso' ? 'fa-check-circle' : 'fa-circle-info';
+  const t = document.createElement('div');
+  t.style.cssText = `
+    display:flex;align-items:center;gap:12px;
+    padding:14px 18px;border-radius:14px;
+    background:#fff;border:1px solid #e2e8f0;
+    box-shadow:0 8px 32px rgba(0,0,0,.12);
+    font-size:.875rem;font-weight:500;color:#0f172a;
+    min-width:260px;max-width:380px;
+    animation:toastIn .35s cubic-bezier(.34,1.56,.64,1);
+  `;
+  t.innerHTML = `
+    <div style="width:32px;height:32px;border-radius:8px;background:${cor}20;color:${cor};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <i class="fa-solid ${icone}"></i>
+    </div>
+    <span>${texto}</span>`;
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.transition = 'all .25s';
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(60px)';
+    setTimeout(() => t.remove(), 300);
+  }, 3500);
+}
+
+function setBtnLoading(btn, sim) {
+  if (sim) {
+    btn.disabled = true;
+    btn.dataset.orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Aguarde...';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.orig || btn.innerHTML;
+  }
+}
+
+function erroFirebase(code) {
+  const map = {
+    'auth/user-not-found':       'E-mail não cadastrado.',
+    'auth/wrong-password':       'Senha incorreta.',
+    'auth/invalid-credential':   'E-mail ou senha incorretos.',
+    'auth/invalid-email':        'E-mail inválido.',
+    'auth/user-disabled':        'Conta desabilitada.',
+    'auth/email-already-in-use': 'E-mail já cadastrado. Faça login.',
+    'auth/weak-password':        'Senha muito fraca (mín. 6 caracteres).',
+    'auth/network-request-failed':'Sem conexão. Verifique sua internet.',
+    'auth/too-many-requests':    'Muitas tentativas. Aguarde alguns minutos.',
+  };
+  return map[code] || 'Erro inesperado. Tente novamente.';
+}
+
+// ── LOGIN ─────────────────────────────────────
+document.getElementById('form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn   = document.getElementById('btn-login');
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  if (!email || !senha) { toast('Preencha e-mail e senha.', 'aviso'); return; }
+  setBtnLoading(btn, true);
+  try {
+    await auth.signInWithEmailAndPassword(email, senha);
+    // Sucesso: redireciona explicitamente para o app (não dependemos mais
+    // do onAuthStateChanged, que agora não navega automaticamente).
+    _loginEmAndamento = true;
+    window.location.href = 'app.html';
+  } catch (err) {
+    toast(erroFirebase(err.code), 'erro');
+    setBtnLoading(btn, false);
+  }
+});
+
+// ── CADASTRO ──────────────────────────────────
+document.getElementById('form-cadastro').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn     = document.getElementById('btn-cadastro');
+  const meuNome = document.getElementById('cad-nome1').value.trim();
+  const nomeP2  = document.getElementById('cad-nome2').value.trim();
+  const email   = document.getElementById('cad-email').value.trim();
+  const senha   = document.getElementById('cad-senha').value;
+
+  if (!meuNome)         { toast('Informe seu nome.', 'aviso'); return; }
+  if (!email)           { toast('Informe o e-mail.', 'aviso'); return; }
+  if (senha.length < 6) { toast('Senha deve ter no mínimo 6 caracteres.', 'aviso'); return; }
+
+  setBtnLoading(btn, true);
+  try {
+    // 1. Cria conta no Firebase Auth
+    const cred = await auth.createUserWithEmailAndPassword(email, senha);
+    const uid  = cred.user.uid;
+
+    // 2. Registra o Espaço_Casal próprio do Usuário (best-effort).
+    //    O identificador é o UID do Usuário (Decisão D1); o parceiro(a)
+    //    entra depois via convite. onAuthStateChanged/resolverCasalId
+    //    reconciliam este documento ao entrar no app.
+    try {
+      const docRef  = db.collection('casais').doc(uid);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const membros = docSnap.data().membros || {};
+        membros[email] = meuNome;
+        await docRef.update({ membros });
+      } else {
+        await docRef.set({
+          nome1: meuNome,
+          nome2: nomeP2 || 'Parceiro(a)',
+          membros: { [email]: meuNome },
+          viagens: [], financas: [], metas: [], checklist: [],
+          criadoEm: new Date().toISOString()
+        });
+      }
+    } catch (fsErr) {
+      console.warn('Firestore (será sincronizado ao entrar):', fsErr.message);
+    }
+
+    toast(`Bem-vindo(a), ${meuNome}! Entrando...`, 'sucesso');
+    // Redireciona explicitamente para o app após o cadastro bem-sucedido.
+    _loginEmAndamento = true;
+    setTimeout(() => { window.location.href = 'app.html'; }, 600);
+
+  } catch (err) {
+    toast(erroFirebase(err.code), 'erro');
+    setBtnLoading(btn, false);
+  }
+});
+
+// ── RESET DE SENHA ────────────────────────────
+document.getElementById('form-reset').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('reset-email').value.trim();
+  if (!email) { toast('Informe o e-mail.', 'aviso'); return; }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    toast('Link enviado! Verifique sua caixa de entrada.', 'sucesso');
+    trocarSecao('login');
+  } catch (err) {
+    toast(erroFirebase(err.code), 'erro');
+  }
+});
+
+// ── GOOGLE ────────────────────────────────────
+// Usa signInWithRedirect — funciona em localhost e produção sem bloqueio de popup
+async function loginGoogle() {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    auth.languageCode = 'pt-BR';
+    await auth.signInWithRedirect(provider);
+  } catch (err) {
+    toast(erroFirebase(err.code), 'erro');
+  }
+}
+
+// Processa o resultado do redirect do Google ao voltar para a página
+auth.getRedirectResult().then((result) => {
+  if (result && result.user) {
+    // Login Google bem-sucedido — redireciona explicitamente para o app.
+    _loginEmAndamento = true;
+    window.location.href = 'app.html';
+  }
+}).catch((err) => {
+  if (err.code && err.code !== 'auth/popup-closed-by-user') {
+    const msgs = {
+      'auth/account-exists-with-different-credential': 'Este e-mail já está cadastrado com outro método. Use e-mail e senha.',
+      'auth/cancelled-popup-request': null, // silencioso
+      'auth/unauthorized-domain': 'Domínio não autorizado no Firebase. Adicione este domínio em Authentication → Authorized domains no console Firebase.',
+    };
+    const msg = msgs[err.code];
+    if (msg !== null) toast(msg || erroFirebase(err.code), 'erro');
+  }
+});
+</script>
+</body>
+</html>
