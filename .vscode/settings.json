@@ -1,0 +1,33 @@
+// Configuração do Live Server (extensão ritwickdey.LiveServer) para o PlannerDuo.
+// Formato JSONC: o VS Code aceita comentários neste arquivo.
+{
+  // Raiz servida pelo Live Server, relativa à raiz do workspace.
+  // É `public/` porque esse é o diretório que o firebase.json publica (hosting.public).
+  // Sem isso, o Live Server serve a raiz do repositório e mostra a listagem de arquivos
+  // em vez da landing (public/index.html).
+  "liveServer.settings.root": "/public",
+
+  // Host fixado em `localhost` em vez do padrão `127.0.0.1`.
+  // O Firebase Auth autoriza `localhost` de fábrica; `127.0.0.1` normalmente não consta
+  // em Authentication → Authorized domains, o que quebra o signInWithRedirect do Google
+  // com o erro auth/unauthorized-domain.
+  "liveServer.settings.host": "localhost",
+
+  // Porta fixada para que a porta documentada seja a porta real.
+  "liveServer.settings.port": 5500,
+
+  // Reproduz os rewrites /app → /app.html e /auth → /auth.html do firebase.json.
+  //
+  // PEGADINHA: `root` e `mount` usam bases diferentes. `root` é relativo à raiz do
+  // workspace e redefine o que é `/`, mas os alvos de `mount` continuam relativos à raiz
+  // do WORKSPACE, não à raiz servida. Daí `./public/app.html` e não `./app.html` —
+  // escrever `./app.html` aqui é o erro natural e resulta em 404 em `/app`.
+  //
+  // O `mount` cobre apenas `/app` e `/auth`: o Live Server não tem equivalente ao rewrite
+  // catch-all `**` do Hosting, então uma rota desconhecida devolve 404 local onde a
+  // produção devolveria a landing. Para paridade total de rotas, use `npm run dev`.
+  "liveServer.settings.mount": [
+    ["/app", "./public/app.html"],
+    ["/auth", "./public/auth.html"]
+  ]
+}

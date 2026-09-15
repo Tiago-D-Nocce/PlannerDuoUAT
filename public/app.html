@@ -669,9 +669,11 @@
             <label class="form-label">Responsável</label>
             <div class="input-wrap">
               <i class="fa-solid fa-user input-icon"></i>
+              <!-- value fixo p1/p2: o texto muda com os nomes do casal, mas o
+                   valor gravado nunca depende do que está renderizado. -->
               <select id="fin-resp">
-                <option id="fin-resp-p1">Pessoa 1</option>
-                <option id="fin-resp-p2">Pessoa 2</option>
+                <option value="p1" id="fin-resp-p1">Pessoa 1</option>
+                <option value="p2" id="fin-resp-p2">Pessoa 2</option>
               </select>
             </div>
           </div>
@@ -1134,8 +1136,8 @@
           <div class="input-wrap">
             <i class="fa-solid fa-user input-icon"></i>
             <select id="edit-fin-resp">
-              <option id="edit-fin-resp-p1">Pessoa 1</option>
-              <option id="edit-fin-resp-p2">Pessoa 2</option>
+              <option value="p1" id="edit-fin-resp-p1">Pessoa 1</option>
+              <option value="p2" id="edit-fin-resp-p2">Pessoa 2</option>
             </select>
           </div>
         </div>
@@ -1266,8 +1268,9 @@
 <script src="app.js"></script>
 
 <script>
-  // Timeout de segurança: se o loader ainda estiver visível após 10s,
-  // provavelmente há um problema de rede ou autenticação — redireciona para login.
+  // Timeout de segurança: se o loader ainda estiver visível após 8s,
+  // provavelmente há problema de rede ou autenticação. Não redireciona
+  // automaticamente — oferece um link manual para o login.
   setTimeout(() => {
     const loader = document.getElementById('loader-tela');
     if (loader && loader.style.display !== 'none' && !loader.classList.contains('saindo')) {

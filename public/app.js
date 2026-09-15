@@ -39,7 +39,8 @@ const Estado = {
     checklist:  [],
     orcamentos: {},      // map categoria -> valor limite mensal
     historicoBuscas: [], // últimas buscas de viagem (max 8, localStorage)
-    unsubscribe: null    // listener ativo do Firestore
+    unsubscribe: null,   // listener ativo do Firestore
+    primeiroSnapshot: false // true após o 1º onSnapshot com dados da nuvem
 };
 
 // ============================================================
@@ -70,11 +71,31 @@ const Utils = {
         return Math.ceil((alvo - hoje) / 86400000);
     },
 
-    slug: (t) => t.trim().toLowerCase()
+    slug: (t) => String(t || '').trim().toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
         .replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-'),
 
-    inicial: (nome) => (nome || '?')[0].toUpperCase(),
+    inicial: (nome) => {
+        const s = String(nome || '').trim();
+        return (s || '?')[0].toUpperCase();
+    },
+
+    // ── Escape de HTML ───────────────────────────────────────
+    // Todo texto vindo do usuário (descrições, destinos, notas, títulos)
+    // passa por aqui antes de ser interpolado via innerHTML. Sem isso um
+    // simples `<` ou `"` numa descrição quebra a tabela/os cards inteiros.
+    esc: (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'),
+
+    // Só devolve o link se for http(s); evita `javascript:` em href.
+    urlSegura: (u) => {
+        const s = String(u || '').trim();
+        return /^https?:\/\//i.test(s) ? s : '';
+    },
 
     // ── Nomes do casal com fallback estável (nunca null/"null") ──
     // Retorna sempre nomes utilizáveis para gravação, comparação e labels.
@@ -82,6 +103,47 @@ const Utils = {
         p1: Estado.nome1 || 'Pessoa 1',
         p2: Estado.nome2 || 'Pessoa 2'
     }),
+
+    // Rótulo da segunda pessoa do espaço. O cadastro cria só a conta individual,
+    // então `nome2` costuma vir vazio; nesse caso deriva do outro membro do mapa
+    // `membros`, que é preenchido quando o parceiro(a) aceita o convite.
+    nome2De: (dados, nome1) => {
+        if (dados && dados.nome2) return dados.nome2;
+        const membros = (dados && dados.membros) || {};
+        return Object.values(membros).find(n => n && n !== nome1) || null;
+    },
+
+    // Identifica a página a partir do pathname, aceitando tanto `/app.html`
+    // quanto `/app`: os rewrites do Hosting (e do dev-server e do Live Server)
+    // servem app.html em `/app`. Comparar por sufixo `.html` fazia isApp/isAuth
+    // virarem false em `/app`, e o ramo sem sessão deixava de redirecionar para
+    // o login — o loader ficava preso para sempre.
+    rotaDe: (pathname) => {
+        const ultimo = String(pathname || '')
+            .split('?')[0]
+            .split('#')[0]
+            .replace(/\/+$/, '')
+            .split('/')
+            .pop()
+            .toLowerCase();
+        if (ultimo === 'app'  || ultimo === 'app.html')  return 'app';
+        if (ultimo === 'auth' || ultimo === 'auth.html') return 'auth';
+        return 'landing';
+    },
+
+    // ── Responsável: value estável do select (p1/p2) <-> nome ─
+    // As options de #fin-resp / #edit-fin-resp têm value fixo p1/p2 e
+    // apenas o textContent muda com os nomes do casal. Assim o valor
+    // gravado nunca depende do texto renderizado no momento do clique.
+    respDeValor: (valor) => {
+        const { p1, p2 } = Utils.nomesCasal();
+        return valor === 'p2' ? p2 : p1;
+    },
+
+    valorDeResp: (nome) => {
+        const { p2 } = Utils.nomesCasal();
+        return nome === p2 ? 'p2' : 'p1';
+    },
 
     // ── Parse de valor monetário pt-BR ───────────────────────
     // Aceita '100,50', '1.234,56' e '100.50'. Se houver vírgula, trata
@@ -115,7 +177,7 @@ const Utils = {
     },
 
     inferirCat: (desc) => {
-        const d = desc.toLowerCase();
+        const d = String(desc || '').toLowerCase();
         if (/(uber|99|onibus|passagem|gasolina|estac|voo|combustivel)/.test(d)) return 'transporte';
         if (/(ifood|burger|pizza|mercado|padaria|restaurante|lanche|açai|sushi|delivery)/.test(d)) return 'alimentacao';
         if (/(netflix|spotify|internet|luz|agua|aluguel|condominio|energia)/.test(d)) return 'moradia';
@@ -163,11 +225,27 @@ const Utils = {
 // ============================================================
 const UI = {
     abrirModal: (id) => {
+        // form.reset() ao fechar apaga a data; repõe "hoje" a cada abertura,
+        // senão da segunda transação em diante o campo abre vazio.
+        if (id === 'modal-financa') {
+            const d = document.getElementById('fin-data');
+            if (d && !d.value) d.value = Utils.hoje();
+        }
         document.getElementById(id)?.classList.add('ativa');
     },
     fecharModal: (id) => {
-        document.getElementById(id)?.classList.remove('ativa');
-        document.querySelector(`#${id} form`)?.reset();
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('ativa');
+        const form = el.querySelector('form');
+        if (form) {
+            form.reset();
+        } else {
+            // Modais sem <form> (orçamento, cofrinho, depósito, convite) não
+            // eram limpos ao fechar e reabriam com o valor anterior.
+            el.querySelectorAll('.modal-body input:not([type="hidden"])')
+              .forEach(i => { i.value = ''; });
+        }
     },
 
     toast: (titulo, corpo = '', tipo = 'sucesso') => {
@@ -176,11 +254,13 @@ const UI = {
         const icones = { sucesso: 'fa-check-circle', erro: 'fa-circle-exclamation', aviso: 'fa-triangle-exclamation', info: 'fa-circle-info' };
         const t = document.createElement('div');
         t.className = `toast ${tipo}`;
+        // Título e corpo frequentemente carregam texto digitado pelo usuário
+        // (descrição da transação, destino da viagem) — escapa antes de injetar.
         t.innerHTML = `
             <div class="toast-icon"><i class="fa-solid ${icones[tipo] || icones.info}"></i></div>
             <div class="toast-msg">
-                <div class="toast-title">${titulo}</div>
-                ${corpo ? `<div class="toast-body">${corpo}</div>` : ''}
+                <div class="toast-title">${Utils.esc(titulo)}</div>
+                ${corpo ? `<div class="toast-body">${Utils.esc(corpo)}</div>` : ''}
             </div>`;
         container.appendChild(t);
         setTimeout(() => {
@@ -273,10 +353,10 @@ function toggleTema() {
 const Auth = {
     iniciarObserver: () => {
         auth.onAuthStateChanged((user) => {
-            const path      = window.location.pathname;
-            const isApp     = path.includes('app.html');
-            const isAuth    = path.includes('auth.html');
-            const isLanding = !isApp && !isAuth;
+            const rota      = Utils.rotaDe(window.location.pathname);
+            const isApp     = rota === 'app';
+            const isAuth    = rota === 'auth';
+            const isLanding = rota === 'landing';
 
             if (user) {
                 Estado.usuarioUid   = user.uid;
@@ -291,9 +371,9 @@ const Auth = {
                     Estado.usuarioNome = user.displayName || null;
                     // Resolve o casalId ANTES de entrar no app; se falhar, cai no
                     // último casalId conhecido (localStorage) para não travar.
-                    Auth.resolverCasalId(user)
+                    Auth._comTimeout(Auth.resolverCasalId(user), 6000)
                         .catch((err) => {
-                            console.warn('Falha ao resolver casalId:', err.code, err.message);
+                            console.warn('Falha ao resolver casalId:', err && (err.code || err.message));
                             Estado.casalId = localStorage.getItem('pd-casalId') || user.uid;
                         })
                         .finally(() => {
@@ -309,6 +389,15 @@ const Auth = {
         });
     },
 
+    // Corrida entre a promessa e um teto de tempo. Sem isso, um get() do
+    // Firestore que nunca resolve deixa o .finally() pendente e o loader preso.
+    // 6s é menor que os 8s da mensagem de espera do app.html, então o app entra
+    // pelo cache antes de o usuário ver o aviso.
+    _comTimeout: (promessa, ms) => Promise.race([
+        promessa,
+        new Promise((_, rejeitar) => setTimeout(() => rejeitar(new Error('timeout')), ms))
+    ]),
+
     _entrarNoApp: (user) => {
         // Sidebar: nome + inicial
         const nome = Estado.nomeUsuario || user.displayName || user.email.split('@')[0];
@@ -319,14 +408,15 @@ const Auth = {
         // Atualizar nomes nos selects
         UI.atualizarNomes();
 
-        // Popular select de mês nas finanças
-        Render.popularSelectMes();
-
         // Carregar cache local primeiro (offline-first)
         DB.carregarCache();
 
-        // Processar despesas recorrentes (gera cópias do mês atual)
-        Controladores.processarRecorrentes();
+        // Popular select de mês nas finanças (depende dos dados já carregados)
+        Render.popularSelectMes();
+
+        // As despesas recorrentes são processadas no primeiro snapshot da
+        // nuvem (DB.ouvirNuvem), não aqui: sobre o cache local o resultado
+        // seria descartado pelo snapshot seguinte.
 
         // Popular selects de viagem e histórico de buscas
         Render.popularSelectViagens();
@@ -417,23 +507,106 @@ const DB = {
     // Chave de Cache_Local derivada do casalId atual (Req 2.6, 7.1).
     chaveCache: () => PlannerCore.chaveCache(Estado.casalId),
 
+    // ── Saneamento na fronteira de entrada ───────────────────
+    // Toda a renderização assume `valor` numérico, `data` no formato
+    // YYYY-MM-DD e `resp` textual. Registros legados (ou gravados por
+    // versões antigas do app) podem violar isso e produzir NaN nos
+    // totais ou TypeError nos filtros. Em vez de espalhar guards por
+    // dezenas de reduces, normalizamos uma única vez ao carregar.
+    _num: (v) => {
+        const n = typeof v === 'number' ? v : Utils.parseValor(v);
+        return isNaN(n) ? 0 : n;
+    },
+
+    _dataValida: (d) => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) ? d : '',
+
+    _resp: (r) => {
+        const s = String(r == null ? '' : r).trim();
+        return (s === '' || s === 'null' || s === 'undefined') ? Utils.nomesCasal().p1 : s;
+    },
+
+    normalizar: (dados) => {
+        const d = dados || {};
+        return {
+            // Só entram finanças com data utilizável — sem isso o select de
+            // meses, os filtros e os gráficos por período quebram.
+            financas: (Array.isArray(d.financas) ? d.financas : [])
+                .filter(f => f && DB._dataValida(f.data))
+                .map(f => ({
+                    ...f,
+                    id: f.id || Utils.id(),
+                    tipo: f.tipo === 'receita' ? 'receita' : 'despesa',
+                    resp: DB._resp(f.resp),
+                    desc: String(f.desc == null ? '' : f.desc),
+                    valor: DB._num(f.valor),
+                    data: DB._dataValida(f.data),
+                    cat: f.cat || Utils.inferirCat(String(f.desc || ''))
+                })),
+            viagens: (Array.isArray(d.viagens) ? d.viagens : [])
+                .filter(v => v)
+                .map(v => ({
+                    ...v,
+                    id: v.id || Utils.id(),
+                    destino: String(v.destino == null ? '' : v.destino),
+                    ida: DB._dataValida(v.ida),
+                    volta: DB._dataValida(v.volta),
+                    orcamento: DB._num(v.orcamento),
+                    guardado: DB._num(v.guardado)
+                })),
+            metas: (Array.isArray(d.metas) ? d.metas : [])
+                .filter(m => m)
+                .map(m => ({
+                    ...m,
+                    id: m.id || Utils.id(),
+                    titulo: String(m.titulo == null ? '' : m.titulo),
+                    alvo: DB._num(m.alvo),
+                    atual: DB._num(m.atual),
+                    prazo: DB._dataValida(m.prazo)
+                })),
+            checklist: (Array.isArray(d.checklist) ? d.checklist : [])
+                .filter(c => c)
+                .map(c => ({
+                    ...c,
+                    id: c.id || Utils.id(),
+                    texto: String(c.texto == null ? '' : c.texto),
+                    cat: c.cat || 'outros',
+                    feito: !!c.feito
+                })),
+            orcamentos: Object.entries(d.orcamentos || {})
+                .reduce((acc, [cat, v]) => {
+                    const n = DB._num(v);
+                    if (n > 0) acc[cat] = n;
+                    return acc;
+                }, {})
+        };
+    },
+
+    _aplicar: (dados) => {
+        const n = DB.normalizar(dados);
+        Estado.financas   = n.financas;
+        Estado.viagens    = n.viagens;
+        Estado.metas      = n.metas;
+        Estado.checklist  = n.checklist;
+        Estado.orcamentos = n.orcamentos;
+    },
+
     carregarCache: () => {
         try {
             const raw = localStorage.getItem(DB.chaveCache());
             if (!raw) return;
             const dados = JSON.parse(raw);
-            Estado.viagens    = dados.viagens    || [];
-            Estado.financas   = dados.financas   || [];
-            Estado.metas      = dados.metas      || [];
-            Estado.checklist  = dados.checklist  || [];
-            Estado.orcamentos = dados.orcamentos || {};
             if (dados.nome1) Estado.nome1 = dados.nome1;
-            if (dados.nome2) Estado.nome2 = dados.nome2;
+            // O cache guarda o documento inteiro, incluindo `membros`, então a
+            // derivação do nome da segunda pessoa vale aqui também.
+            const nome2Cache = Utils.nome2De(dados, Estado.nome1);
+            if (nome2Cache) Estado.nome2 = nome2Cache;
+            DB._aplicar(dados);
         } catch {}
     },
 
     ouvirNuvem: () => {
         if (Estado.unsubscribe) Estado.unsubscribe();
+        Estado.primeiroSnapshot = false;
         Estado.unsubscribe = db.collection('casais').doc(Estado.casalId)
             .onSnapshot((doc) => {
                 if (!doc.exists) {
@@ -441,11 +614,6 @@ const DB = {
                     return;
                 }
                 const dados = doc.data();
-                Estado.viagens    = dados.viagens    || [];
-                Estado.financas   = dados.financas   || [];
-                Estado.metas      = dados.metas      || [];
-                Estado.checklist  = dados.checklist  || [];
-                Estado.orcamentos = dados.orcamentos || {};
                 if (dados.nome1) {
                     Estado.nome1 = dados.nome1;
                     // Atualiza nome do usuário logado pelo campo membros
@@ -457,9 +625,25 @@ const DB = {
                         if (elAv)   elAv.textContent   = Utils.inicial(Estado.nomeUsuario);
                     }
                 }
-                if (dados.nome2) Estado.nome2 = dados.nome2;
+                // Só sobrescreve quando há um nome utilizável: atribuir null
+                // apagaria um nome já conhecido de um snapshot anterior.
+                const nome2Nuvem = Utils.nome2De(dados, Estado.nome1);
+                if (nome2Nuvem) Estado.nome2 = nome2Nuvem;
                 UI.atualizarNomes();
+
+                // Substitui o estado pelos dados da nuvem, já saneados.
+                DB._aplicar(dados);
                 try { localStorage.setItem(DB.chaveCache(), JSON.stringify(dados)); } catch {}
+
+                // Recorrentes só são processadas DEPOIS do primeiro snapshot:
+                // rodar antes disso opera sobre cache possivelmente vazio e as
+                // cópias geradas seriam sobrescritas por este mesmo snapshot.
+                if (!Estado.primeiroSnapshot) {
+                    Estado.primeiroSnapshot = true;
+                    Controladores.processarRecorrentes();
+                }
+
+                Render.popularSelectMes();
                 Render.tudo();
             }, (err) => {
                 console.warn('Firestore onSnapshot erro:', err.code, err.message);
@@ -605,7 +789,7 @@ const Controladores = {
     // ── Finanças ────────────────────────────────────────────
     adicionarFinanca: () => {
         const tipo  = document.getElementById('fin-tipo').value;
-        let   resp  = document.getElementById('fin-resp').value;
+        const resp  = Utils.respDeValor(document.getElementById('fin-resp').value);
         const desc  = document.getElementById('fin-desc').value.trim();
         const valor = Utils.parseValor(document.getElementById('fin-valor').value);
         const data  = document.getElementById('fin-data').value;
@@ -614,9 +798,6 @@ const Controladores = {
         const viagemId   = document.getElementById('fin-viagem')?.value || '';
         let   recorrente = document.getElementById('fin-recorrente')?.value || '';
         const parcelas   = parseInt(document.getElementById('fin-parcelas')?.value) || 1;
-
-        // Responsável nunca pode ser gravado como "null" ou vazio.
-        if (!resp || resp === 'null') resp = Utils.nomesCasal().p1;
 
         if (!desc || !data || isNaN(valor) || valor <= 0) return UI.toast('Preencha os campos corretamente', '', 'aviso');
 
@@ -707,7 +888,7 @@ const Controladores = {
         if (!f) return;
         document.getElementById('edit-fin-id').value          = f.id;
         document.getElementById('edit-fin-tipo').value        = f.tipo;
-        document.getElementById('edit-fin-resp').value        = f.resp;
+        document.getElementById('edit-fin-resp').value        = Utils.valorDeResp(f.resp);
         document.getElementById('edit-fin-desc').value        = f.desc;
         document.getElementById('edit-fin-valor').value       = f.valor;
         document.getElementById('edit-fin-data').value        = f.data;
@@ -721,15 +902,22 @@ const Controladores = {
         const id  = document.getElementById('edit-fin-id').value;
         const idx = Estado.financas.findIndex(f => f.id === id);
         if (idx === -1) return;
-        let respEdit = document.getElementById('edit-fin-resp').value;
-        if (!respEdit || respEdit === 'null') respEdit = Utils.nomesCasal().p1;
+
+        const desc  = document.getElementById('edit-fin-desc').value.trim();
+        const valor = Utils.parseValor(document.getElementById('edit-fin-valor').value);
+        const data  = document.getElementById('edit-fin-data').value;
+
+        // Mesma validação da criação: o modal não usa submit real, então
+        // os atributos min/required do HTML não são aplicados.
+        if (!desc || !data || isNaN(valor) || valor <= 0) {
+            return UI.toast('Preencha os campos corretamente', '', 'aviso');
+        }
+
         Estado.financas[idx] = {
             ...Estado.financas[idx],
             tipo:  document.getElementById('edit-fin-tipo').value,
-            resp:  respEdit,
-            desc:  document.getElementById('edit-fin-desc').value.trim(),
-            valor: Utils.parseValor(document.getElementById('edit-fin-valor').value),
-            data:  document.getElementById('edit-fin-data').value,
+            resp:  Utils.respDeValor(document.getElementById('edit-fin-resp').value),
+            desc, valor, data,
             cat:   document.getElementById('edit-fin-categoria').value,
             viagemId: document.getElementById('edit-fin-viagem')?.value || '',
         };
@@ -814,7 +1002,7 @@ const Controladores = {
             ? despesasViagem.map(f => `
                 <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem">
                     <span style="color:var(--text-muted);white-space:nowrap">${Utils.data(f.data)}</span>
-                    <span style="flex:1">${f.desc}</span>
+                    <span style="flex:1">${Utils.esc(f.desc)}</span>
                     <strong style="color:var(--brand-rose)">${Utils.moeda(f.valor)}</strong>
                 </div>`).join('')
             : `<div style="font-size:.85rem;color:var(--text-muted);padding:8px 0">Nenhuma despesa vinculada ainda.</div>`;
@@ -824,7 +1012,7 @@ const Controladores = {
                 <div class="form-row">
                     <div>
                         <div class="form-label">Tipo</div>
-                        <span class="badge badge-viagem">${v.tipo || '—'}</span>
+                        <span class="badge badge-viagem">${Utils.esc(v.tipo || '—')}</span>
                     </div>
                     <div>
                         <div class="form-label">Orçamento</div>
@@ -850,8 +1038,8 @@ const Controladores = {
                 <div class="form-label">Despesas vinculadas</div>
                 <div style="background:var(--surface-alt);padding:12px 14px;border-radius:var(--r-lg);border:1px solid var(--border)">${listaDespesas}</div>
             </div>
-            ${v.link ? `<div class="form-group"><a href="${v.link}" target="_blank" class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-up-right-from-square"></i> Acessar Reserva</a></div>` : ''}
-            ${v.notas ? `<div class="form-group"><div class="form-label">Notas / Roteiro</div><div style="background:var(--surface-alt);padding:14px;border-radius:var(--r-lg);font-size:.875rem;white-space:pre-wrap;border:1px solid var(--border)">${v.notas}</div></div>` : ''}
+            ${Utils.urlSegura(v.link) ? `<div class="form-group"><a href="${Utils.esc(Utils.urlSegura(v.link))}" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-up-right-from-square"></i> Acessar Reserva</a></div>` : ''}
+            ${v.notas ? `<div class="form-group"><div class="form-label">Notas / Roteiro</div><div style="background:var(--surface-alt);padding:14px;border-radius:var(--r-lg);font-size:.875rem;white-space:pre-wrap;border:1px solid var(--border)">${Utils.esc(v.notas)}</div></div>` : ''}
             <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">
                 <button class="btn btn-danger btn-sm" onclick="Controladores.deletar('viagens','${v.id}');UI.fecharModal('modal-viagem-detalhe')">
                     <i class="fa-solid fa-trash"></i> Excluir
@@ -876,6 +1064,8 @@ const Controladores = {
         DB.salvar('metas');
         UI.fecharModal('modal-meta');
         UI.toast('Meta criada!', `${emoji} ${titulo} — Alvo: ${Utils.moeda(alvo)}`, 'sucesso');
+        Render.metas();
+        Render.dashboard();
     },
 
     depositarMeta: () => {
@@ -1004,9 +1194,11 @@ const ServicoBusca = {
         const el = document.getElementById('busca-historico');
         if (!el) return;
         if (!Estado.historicoBuscas.length) { el.innerHTML = ''; return; }
-        const chips = Estado.historicoBuscas.map((b, i) =>
-            `<button type="button" class="badge badge-viagem" style="cursor:pointer;border:none" onclick="ServicoBusca.aplicarHistorico(${i})" title="${b.origem||''} → ${b.destino}">${b.origem ? b.origem + ' → ' : ''}${b.destino}</button>`
-        ).join('');
+        const chips = Estado.historicoBuscas.map((b, i) => {
+            const origem  = Utils.esc(b.origem || '');
+            const destino = Utils.esc(b.destino || '');
+            return `<button type="button" class="badge badge-viagem" style="cursor:pointer;border:none" onclick="ServicoBusca.aplicarHistorico(${i})" title="${origem} → ${destino}">${origem ? origem + ' → ' : ''}${destino}</button>`;
+        }).join('');
         el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px">
             <span style="font-size:.78rem;color:rgba(255,255,255,.6)">Buscas recentes:</span>
             ${chips}
@@ -1530,7 +1722,7 @@ const Render = {
     // ── Popula os selects de viagem nos modais de finança ────
     popularSelectViagens: () => {
         const opts = '<option value="">Nenhuma</option>' +
-            Estado.viagens.map(v => `<option value="${v.id}">${v.emoji || '✈️'} ${v.destino}</option>`).join('');
+            Estado.viagens.map(v => `<option value="${Utils.esc(v.id)}">${Utils.esc(v.emoji || '✈️')} ${Utils.esc(v.destino)}</option>`).join('');
         ['fin-viagem', 'edit-fin-viagem'].forEach(id => {
             const sel = document.getElementById(id);
             if (!sel) return;
@@ -1755,7 +1947,7 @@ const Render = {
             blocoViagem = `
                 <div style="${miniCard}">
                     <div style="${tituloMini}">Próxima Viagem</div>
-                    <div style="${valorGrande}">${prox.emoji||'✈️'} ${prox.destino}</div>
+                    <div style="${valorGrande}">${Utils.esc(prox.emoji||'✈️')} ${Utils.esc(prox.destino)}</div>
                     <div style="font-size:.85rem;color:var(--text-muted);margin:8px 0 4px">${diasTxt}</div>
                     <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px">
                         🐷 ${Utils.moeda(guardado)}${orc > 0 ? ` de ${Utils.moeda(orc)} (${pctCofre}%)` : ''}
@@ -1815,9 +2007,9 @@ const Render = {
             const statusTxt = semData ? '—' : dias > 0 ? `Faltam ${dias} dias` : dias === 0 ? 'Hoje!' : 'Em andamento';
             const badgeCls = semData ? 'badge-viagem' : dias <= 0 ? 'badge-success' : dias <= 30 ? 'badge-alerta' : 'badge-viagem';
             return `<div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--border)">
-                <div style="width:42px;height:42px;border-radius:12px;background:var(--grad-cool);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${v.emoji||'✈️'}</div>
+                <div style="width:42px;height:42px;border-radius:12px;background:var(--grad-cool);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0">${Utils.esc(v.emoji||'✈️')}</div>
                 <div style="flex:1">
-                    <div style="font-weight:700">${v.destino}</div>
+                    <div style="font-weight:700">${Utils.esc(v.destino)}</div>
                     <div style="font-size:.78rem;color:var(--text-muted)">${Utils.data(v.ida)} → ${Utils.data(v.volta)}</div>
                 </div>
                 <span class="badge ${badgeCls}">${statusTxt}</span>
@@ -1871,9 +2063,9 @@ const Render = {
             const badgeParc = f.parcela ? ` <span class="badge badge-alerta" style="font-size:.65rem">💳 ${f.parcela.atual}/${f.parcela.total}</span>` : '';
             return `<tr>
                 <td style="white-space:nowrap">${Utils.data(f.data)}</td>
-                <td><strong>${f.desc}</strong>${badgeRec}${badgeParc}</td>
+                <td><strong>${Utils.esc(f.desc)}</strong>${badgeRec}${badgeParc}</td>
                 <td><span class="cat-pill">${ci.emoji} ${ci.label}</span></td>
-                <td>${f.resp}</td>
+                <td>${Utils.esc(f.resp)}</td>
                 <td><span class="badge ${f.tipo==='receita'?'badge-receita':'badge-despesa'}">${f.tipo==='receita'?'Receita':'Despesa'}</span></td>
                 <td><strong style="color:${f.tipo==='receita'?'var(--brand-emerald)':'var(--brand-rose)'}">${f.tipo==='receita'?'+':'-'} ${Utils.moeda(f.valor)}</strong></td>
                 <td class="td-actions">
@@ -1920,7 +2112,7 @@ const Render = {
             return true;
         });
 
-        if (busca) lista = lista.filter(v => v.destino.toLowerCase().includes(busca));
+        if (busca) lista = lista.filter(v => (v.destino || '').toLowerCase().includes(busca));
 
         if (!lista.length) {
             grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
@@ -1964,10 +2156,12 @@ const Render = {
             const guardado  = v.guardado || 0;
             const pctGuard  = v.orcamento > 0 ? Math.min(100, Math.round(guardado / v.orcamento * 100)) : 0;
 
+            const linkSeguro = Utils.urlSegura(v.link);
+
             return `<div class="trip-card" onclick="Controladores.abrirDetalheViagem('${v.id}')">
-                <div class="trip-card-hero" style="background:${grad}" data-emoji="${v.emoji||'✈️'}">
+                <div class="trip-card-hero" style="background:${grad}" data-emoji="${Utils.esc(v.emoji||'✈️')}">
                     <span class="trip-status-badge ${statusCls}">${statusTxt}</span>
-                    <div class="trip-destination">${v.destino}</div>
+                    <div class="trip-destination">${Utils.esc(v.destino)}</div>
                 </div>
                 <div class="trip-card-body">
                     <div class="trip-dates">
@@ -1986,7 +2180,7 @@ const Render = {
                     ` : ''}
                 </div>
                 <div class="trip-card-footer">
-                    ${v.link ? `<a href="${v.link}" target="_blank" onclick="event.stopPropagation()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-link"></i> Reserva</a>` : ''}
+                    ${linkSeguro ? `<a href="${Utils.esc(linkSeguro)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-link"></i> Reserva</a>` : ''}
                     <button class="btn btn-success btn-sm" onclick="event.stopPropagation();Controladores.abrirCofrinhoViagem('${v.id}')"><i class="fa-solid fa-piggy-bank"></i> Guardar</button>
                     <button class="btn btn-icon danger" onclick="event.stopPropagation();Controladores.deletar('viagens','${v.id}')"><i class="fa-solid fa-trash"></i></button>
                 </div>
@@ -2024,7 +2218,17 @@ const Render = {
 
         const catCores = { viagem:'var(--brand-blue)', emergencia:'var(--brand-emerald)', imovel:'var(--brand-purple)', veiculo:'var(--brand-orange)', educacao:'var(--brand-amber)', casamento:'var(--brand-rose)', investimento:'var(--brand-teal)', outros:'var(--text-muted)' };
 
-        grid.innerHTML = Estado.metas.sort((a,b)=>new Date(a.prazo)-new Date(b.prazo)).map(m => {
+        // Cópia antes de ordenar: `.sort()` mutaria Estado.metas, alterando a
+        // ordem que será gravada na nuvem só por ter renderizado a tela.
+        // Metas sem prazo vão para o fim em vez de virarem NaN na comparação.
+        const ordenadas = [...Estado.metas].sort((a, b) => {
+            if (!a.prazo && !b.prazo) return 0;
+            if (!a.prazo) return 1;
+            if (!b.prazo) return -1;
+            return new Date(a.prazo) - new Date(b.prazo);
+        });
+
+        grid.innerHTML = ordenadas.map(m => {
             const pct      = Math.min(100, Math.round((m.atual||0) / m.alvo * 100));
             const concluida= m.atual >= m.alvo;
             const diasPrazo= m.prazo ? Utils.diasAte(m.prazo) : null;
@@ -2044,10 +2248,10 @@ const Render = {
             return `<div class="goal-card">
                 <div class="goal-card-header">
                     <div style="display:flex;align-items:center;gap:10px">
-                        <div class="goal-icon" style="background:${cor}20;color:${cor};font-size:1.2rem">${m.emoji||'🎯'}</div>
+                        <div class="goal-icon" style="background:${cor}20;color:${cor};font-size:1.2rem">${Utils.esc(m.emoji||'🎯')}</div>
                         <div>
-                            <div class="goal-title">${m.titulo}</div>
-                            ${m.desc ? `<div class="goal-desc">${m.desc}</div>` : ''}
+                            <div class="goal-title">${Utils.esc(m.titulo)}</div>
+                            ${m.desc ? `<div class="goal-desc">${Utils.esc(m.desc)}</div>` : ''}
                         </div>
                     </div>
                     <button class="btn-icon danger" onclick="Controladores.deletar('metas','${m.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -2093,8 +2297,8 @@ const Render = {
                 <div class="check-toggle" onclick="Checklist.toggle('${c.id}')">
                     ${c.feito ? '<i class="fa-solid fa-check"></i>' : ''}
                 </div>
-                <span class="check-text">${c.texto}</span>
-                <span class="check-category">${c.cat}</span>
+                <span class="check-text">${Utils.esc(c.texto)}</span>
+                <span class="check-category">${Utils.esc(c.cat)}</span>
                 <button class="btn-icon danger" style="width:28px;height:28px;font-size:.75rem" onclick="Checklist.remover('${c.id}')"><i class="fa-solid fa-xmark"></i></button>
             </div>`).join('');
     }

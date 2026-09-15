@@ -4,7 +4,10 @@
   "description": "Aplicação web privada para casais gerenciarem finanças compartilhadas e planejamento de viagens.",
   "private": true,
   "scripts": {
-    "test": "vitest --run"
+    "dev": "node scripts/dev-server.mjs",
+    "verificar": "node scripts/verificar-frontend.mjs",
+    "test": "vitest --run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "fast-check": "^3.23.1",

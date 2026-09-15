@@ -121,15 +121,15 @@
         </button>
 
         <p class="auth-switch">
-          Primeiro acesso? <a href="#" onclick="trocarSecao('cadastro')">Criar conta do casal</a>
+          Primeiro acesso? <a href="#" onclick="trocarSecao('cadastro')">Criar conta</a>
           &nbsp;·&nbsp; <a href="#" onclick="trocarConta()" style="color:var(--text-muted);font-size:.8rem">Trocar conta</a>
         </p>
       </div>
 
       <!-- CADASTRO -->
       <div id="secao-cadastro" class="auth-section">
-        <div class="auth-form-title">Criar conta do casal 💑</div>
-        <p class="auth-form-sub">Vocês dois precisam criar contas separadas com seus próprios e-mails.</p>
+        <div class="auth-form-title">Criar sua conta 🎉</div>
+        <p class="auth-form-sub">Crie sua conta para começar. Depois você pode convidar seu parceiro(a) pelo app com um código de convite.</p>
 
         <form id="form-cadastro" novalidate>
           <div class="form-group">
@@ -138,14 +138,6 @@
               <i class="fa-solid fa-user input-icon"></i>
               <input type="text" id="cad-nome1" placeholder="Ex: seu nome" required>
             </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nome do(a) parceiro(a)</label>
-            <div class="input-wrap">
-              <i class="fa-solid fa-heart input-icon"></i>
-              <input type="text" id="cad-nome2" placeholder="Ex: nome do parceiro(a)" required>
-            </div>
-            <p class="form-hint">Seu parceiro(a) deve criar a conta própria dele(a) depois.</p>
           </div>
           <div class="form-group">
             <label class="form-label">Seu e-mail</label>
@@ -166,7 +158,7 @@
           </div>
 
           <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-cadastro">
-            <i class="fa-solid fa-heart"></i> Criar Minha Conta
+            <i class="fa-solid fa-user-plus"></i> Criar Minha Conta
           </button>
         </form>
 
@@ -321,8 +313,23 @@ function erroFirebase(code) {
     'auth/weak-password':        'Senha muito fraca (mín. 6 caracteres).',
     'auth/network-request-failed':'Sem conexão. Verifique sua internet.',
     'auth/too-many-requests':    'Muitas tentativas. Aguarde alguns minutos.',
+    // Código atual do backend para credencial errada quando a proteção de
+    // enumeração de e-mail está ativa. Sem ele, o login falhava com um
+    // "Erro inesperado" que não dizia nada.
+    'auth/invalid-login-credentials': 'E-mail ou senha incorretos.',
+    'auth/missing-password':     'Informe a senha.',
+    'auth/missing-email':        'Informe o e-mail.',
+    'auth/operation-not-allowed':'Login por e-mail/senha não está habilitado no projeto Firebase (Authentication → Sign-in method).',
+    'auth/unauthorized-domain':  'Domínio não autorizado. Adicione este host em Authentication → Authorized domains.',
+    'auth/popup-blocked':        'O navegador bloqueou a janela de login.',
+    'auth/internal-error':       'Erro interno do Firebase. Tente novamente.',
+    'auth/invalid-api-key':      'Chave de API inválida na configuração do Firebase.',
   };
-  return map[code] || 'Erro inesperado. Tente novamente.';
+  if (map[code]) return map[code];
+  // Fallback diagnosticável: o código bruto vai para o DevTools e também
+  // aparece na mensagem, senão a falha fica impossível de investigar.
+  console.error('[auth]', code);
+  return code ? `Falha no login (${code}).` : 'Erro inesperado. Tente novamente.';
 }
 
 // ── LOGIN ─────────────────────────────────────
@@ -350,7 +357,6 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
   e.preventDefault();
   const btn     = document.getElementById('btn-cadastro');
   const meuNome = document.getElementById('cad-nome1').value.trim();
-  const nomeP2  = document.getElementById('cad-nome2').value.trim();
   const email   = document.getElementById('cad-email').value.trim();
   const senha   = document.getElementById('cad-senha').value;
 
@@ -378,7 +384,10 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
       } else {
         await docRef.set({
           nome1: meuNome,
-          nome2: nomeP2 || 'Parceiro(a)',
+          // O rótulo da segunda pessoa passa a ser derivado de `membros`
+          // quando o convite é aceito. Gravar aqui um rótulo literal criava
+          // um nome falso, que acabava virando valor de `resp` nas transações.
+          nome2: null,
           membros: { [email]: meuNome },
           viagens: [], financas: [], metas: [], checklist: [],
           criadoEm: new Date().toISOString()
