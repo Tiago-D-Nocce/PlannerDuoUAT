@@ -77,6 +77,7 @@ function carregarApp() {
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     document: docFalso,
     window: {},
+    location: { pathname: '/app', replace() {} },
     navigator: { clipboard: { writeText() {} } },
     firebase: {
       apps: [],
@@ -90,7 +91,8 @@ function carregarApp() {
 
   vm.createContext(contexto);
 
-  // core.js precisa vir antes: app.js usa PlannerCore.chaveCache/nomePadrao.
+  // Dependências globais clássicas precisam vir antes de app.js.
+  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'auth-errors.js'), 'utf8'), contexto, { filename: 'auth-errors.js' });
   vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'core.js'), 'utf8'), contexto, { filename: 'core.js' });
   vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'app.js'), 'utf8'), contexto, { filename: 'app.js' });
 
@@ -168,6 +170,33 @@ describe('Auth._comTimeout', () => {
   it('propaga a rejeição original quando ela chega antes do prazo', async () => {
     const falha = Promise.reject(new Error('permission-denied'));
     await expect(Auth._comTimeout(falha, 200)).rejects.toThrow('permission-denied');
+  });
+});
+
+describe('bootstrap autenticado do app', () => {
+  const user = { uid: 'usuario-1', email: 'pessoa@example.invalid', displayName: 'Pessoa' };
+
+  it('resolverCasalId retorna o ID sem mutar o estado fora da corrida', async () => {
+    await expect(Auth.resolverCasalId(user)).resolves.toBe(user.uid);
+    expect(Estado.casalId).toBeNull();
+  });
+
+  it('só entra no app depois de aplicar o casalId resolvido', async () => {
+    let estadoAoEntrar = null;
+    Auth.resolverCasalId = async () => 'casal-resolvido';
+    Auth._entrarNoApp = () => { estadoAoEntrar = Estado.casalId; };
+
+    await Auth._processarEstado(user);
+
+    expect(Estado.casalId).toBe('casal-resolvido');
+    expect(estadoAoEntrar).toBe('casal-resolvido');
+  });
+
+  it('propaga falha de montagem para o catch do observer', async () => {
+    Auth.resolverCasalId = async () => 'casal-resolvido';
+    Auth._entrarNoApp = () => { throw new Error('falha-de-montagem'); };
+
+    await expect(Auth._processarEstado(user)).rejects.toThrow('falha-de-montagem');
   });
 });
 

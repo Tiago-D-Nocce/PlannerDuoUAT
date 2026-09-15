@@ -23,7 +23,7 @@ const PORTA = Number(argPorta !== -1 ? process.argv[argPorta + 1] : 5177);
 const BASE = `http://localhost:${PORTA}`;
 
 const PAGINAS = ['index.html', 'app.html', 'auth.html'];
-const SCRIPTS = ['app.js', 'core.js'];
+const SCRIPTS = ['app.js', 'core.js', 'auth-errors.js', 'bootstrap.js'];
 
 const falhas = [];
 const ok = [];
@@ -74,6 +74,8 @@ const ESPERADO = {
   '/style.css': ['style.css', 'text/css'],
   '/app.js': ['app.js', 'text/javascript'],
   '/core.js': ['core.js', 'text/javascript'],
+  '/auth-errors.js': ['auth-errors.js', 'text/javascript'],
+  '/bootstrap.js': ['bootstrap.js', 'text/javascript'],
 };
 
 for (const [rota, [arquivo, tipo]] of Object.entries(ESPERADO)) {

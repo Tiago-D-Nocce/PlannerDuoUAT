@@ -20,7 +20,18 @@ const db   = firebase.firestore();
 
 // SEGURANÇA: sessão válida apenas enquanto a aba estiver aberta. Ao fechar o
 // navegador ou abrir de novo pela landing, é necessário logar outra vez.
-auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).catch(() => {});
+// A persistência é requisito do bootstrap: uma falha/timeout não inicia o
+// observer atrás da mesma fila do Auth e deixa retry/login visíveis.
+const persistenciaAuth = PlannerAuthErrors.limitarOperacaoAuth(
+    auth.setPersistence(firebase.auth.Auth.Persistence.SESSION),
+    3000
+).then(
+    () => true,
+    (err) => {
+        PlannerAuthErrors.registrarErroAuth(err, 'persistencia');
+        return false;
+    }
+);
 
 // ── Estado Global ─────────────────────────────────────────────
 // O identificador do Espaço_Casal (casalId) é resolvido dinamicamente
@@ -351,56 +362,124 @@ function toggleTema() {
 // AUTENTICAÇÃO
 // ============================================================
 const Auth = {
+    _navegando: false,
+
     iniciarObserver: () => {
-        auth.onAuthStateChanged((user) => {
-            const rota      = Utils.rotaDe(window.location.pathname);
-            const isApp     = rota === 'app';
-            const isAuth    = rota === 'auth';
-            const isLanding = rota === 'landing';
-
-            if (user) {
-                Estado.usuarioUid   = user.uid;
-                Estado.usuarioEmail = user.email;
-
-                if (isAuth || isLanding) {
-                    window.location.href = 'app.html';
-                    return;
+        try {
+            return auth.onAuthStateChanged(
+                (user) => {
+                    Auth._processarEstado(user).catch(() => {
+                        Auth._falharBootstrap('inicializacao');
+                    });
+                },
+                (err) => {
+                    PlannerAuthErrors.registrarErroAuth(err, 'autenticacao');
+                    Auth._falharBootstrap('autenticacao');
                 }
-
-                if (isApp) {
-                    Estado.usuarioNome = user.displayName || null;
-                    // Resolve o casalId ANTES de entrar no app; se falhar, cai no
-                    // último casalId conhecido (localStorage) para não travar.
-                    Auth._comTimeout(Auth.resolverCasalId(user), 6000)
-                        .catch((err) => {
-                            console.warn('Falha ao resolver casalId:', err && (err.code || err.message));
-                            Estado.casalId = localStorage.getItem('pd-casalId') || user.uid;
-                        })
-                        .finally(() => {
-                            localStorage.setItem('pd-casalId', Estado.casalId);
-                            Auth._entrarNoApp(user);
-                        });
-                }
-            } else {
-                if (isApp) {
-                    window.location.href = 'auth.html';
-                }
-            }
-        });
+            );
+        } catch (err) {
+            PlannerAuthErrors.registrarErroAuth(err, 'autenticacao');
+            Auth._falharBootstrap('autenticacao');
+            return null;
+        }
     },
 
-    // Corrida entre a promessa e um teto de tempo. Sem isso, um get() do
-    // Firestore que nunca resolve deixa o .finally() pendente e o loader preso.
-    // 6s é menor que os 8s da mensagem de espera do app.html, então o app entra
-    // pelo cache antes de o usuário ver o aviso.
-    _comTimeout: (promessa, ms) => Promise.race([
-        promessa,
-        new Promise((_, rejeitar) => setTimeout(() => rejeitar(new Error('timeout')), ms))
-    ]),
+    _processarEstado: async (user) => {
+        const rota      = Utils.rotaDe(window.location.pathname);
+        const isApp     = rota === 'app';
+        const isAuth    = rota === 'auth';
+        const isLanding = rota === 'landing';
+
+        if (!user) {
+            if (isApp) Auth._redirecionar('auth.html');
+            return;
+        }
+
+        Estado.usuarioUid   = user.uid;
+        Estado.usuarioEmail = user.email;
+
+        if (isAuth || isLanding) {
+            Auth._redirecionar('app.html');
+            return;
+        }
+        if (!isApp) return;
+
+        Estado.usuarioNome = user.displayName || null;
+        try {
+            Estado.casalId = await Auth._comTimeout(Auth.resolverCasalId(user), 6000);
+        } catch (err) {
+            // O app continua offline-first sem registrar código, mensagem,
+            // caminho de documento ou qualquer payload bruto do Firestore.
+            console.warn('[PlannerDuo firestore]', {
+                evento: 'casal-id-fallback',
+                erroRecebido: Boolean(err),
+            });
+            try {
+                Estado.casalId = localStorage.getItem('pd-casalId') || user.uid;
+            } catch (_) {
+                Estado.casalId = user.uid;
+            }
+        }
+
+        if (!Estado.casalId) Estado.casalId = user.uid;
+        try { localStorage.setItem('pd-casalId', Estado.casalId); } catch {}
+        // Qualquer exceção síncrona da montagem do shell sobe para o catch do
+        // observer, que troca o loader por uma falha recuperável.
+        Auth._entrarNoApp(user);
+    },
+
+    _redirecionar: (destino) => {
+        if (Auth._navegando) return;
+        Auth._navegando = true;
+        if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
+        if (window.location && typeof window.location.replace === 'function') {
+            window.location.replace(destino);
+        } else {
+            window.location.href = destino;
+        }
+    },
+
+    _falharBootstrap: (categoria) => {
+        console.warn('[PlannerDuo bootstrap]', {
+            evento: 'app-init-failure',
+            categoria: ['autenticacao', 'firestore', 'inicializacao'].includes(categoria)
+                ? categoria
+                : 'inicializacao',
+        });
+        if (window.PlannerBootstrap) {
+            window.PlannerBootstrap.falhar(categoria);
+            return;
+        }
+        // Fallback caso o próprio supervisor local não tenha sido carregado.
+        const mensagem = document.getElementById('loader-msg');
+        const acoes = document.getElementById('loader-acoes');
+        if (mensagem) mensagem.textContent = 'Não foi possível iniciar o PlannerDuo. Verifique sua conexão e tente novamente.';
+        if (acoes) {
+            acoes.hidden = false;
+            acoes.style.display = 'flex';
+        }
+    },
+
+    // Corrida com cancelamento do timer: resolve/rejeita exatamente como a
+    // promessa original e nunca mantém um timeout órfão após a conclusão.
+    _comTimeout: (promessa, ms) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('timeout')), ms);
+        Promise.resolve(promessa).then(
+            (valor) => {
+                clearTimeout(timer);
+                resolve(valor);
+            },
+            (err) => {
+                clearTimeout(timer);
+                reject(err);
+            }
+        );
+    }),
 
     _entrarNoApp: (user) => {
         // Sidebar: nome + inicial
-        const nome = Estado.nomeUsuario || user.displayName || user.email.split('@')[0];
+        const email = typeof user.email === 'string' ? user.email : '';
+        const nome = Estado.nomeUsuario || user.displayName || email.split('@')[0] || 'Usuário';
         Estado.nomeUsuario = nome;
         document.getElementById('sidebar-user-name').textContent = nome;
         document.getElementById('sidebar-avatar').textContent    = Utils.inicial(nome);
@@ -422,25 +501,38 @@ const Auth = {
         Render.popularSelectViagens();
         ServicoBusca.carregarHistorico();
 
-        // Ouvir Firestore em tempo real
-        DB.ouvirNuvem();
+        // Ouvir Firestore em tempo real sem bloquear o modo offline quando a
+        // criação do listener falhar de forma síncrona.
+        try {
+            DB.ouvirNuvem();
+        } catch (err) {
+            console.warn('[PlannerDuo firestore]', {
+                evento: 'listener-nao-iniciado',
+                erroRecebido: Boolean(err),
+            });
+        }
 
-        // Esconder loader
-        Auth._esconderLoader();
-        const app = document.getElementById('tela-app');
-        if (app) app.style.opacity = '1';
-
-        // Restaurar tema salvo
-        const temaSalvo = localStorage.getItem('pd-tema');
+        // Restaurar tema salvo (armazenamento pode estar bloqueado pelo navegador).
+        let temaSalvo = null;
+        try { temaSalvo = localStorage.getItem('pd-tema'); } catch {}
         if (temaSalvo) {
             document.documentElement.setAttribute('data-theme', temaSalvo);
             const icon = document.getElementById('btn-tema')?.querySelector('i');
             if (icon) icon.className = temaSalvo === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
         }
 
-        // Iniciar navegação
+        // O loader só termina depois que toda a montagem síncrona conclui. Se
+        // qualquer etapa lançar, o observer mantém o shell oculto e exibe as
+        // ações de recuperação do supervisor.
         UI.setupNav();
         Render.tudo();
+
+        const estadoBootstrap = window.PlannerBootstrap
+            ? window.PlannerBootstrap.estadoAtual().estado
+            : 'pendente';
+        if (estadoBootstrap === 'erro') return;
+        Auth._esconderLoader();
+        if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
     },
 
     _esconderLoader: () => {
@@ -458,7 +550,9 @@ const Auth = {
     //   - `casais/{uid}` não existe   -> cria novo Espaço_Casal, casalId = uid;
     //   - tem `casalIdRef` (ponteiro)  -> casalId = casalIdRef;
     //   - caso contrário               -> casalId = uid (espaço próprio).
-    // Grava o resultado em Estado.casalId e retorna-o.
+    // Retorna o identificador sem alterar Estado: se o timeout vencer, a
+    // promessa do Firestore pode terminar depois, mas não pode trocar o espaço
+    // que já foi escolhido pelo fallback e usado para abrir listeners/escritas.
     // Requirements: 2.1, 2.2, 2.3, 2.6, 6.2
     resolverCasalId: async (user) => {
         const ref  = db.collection('casais').doc(user.uid);
@@ -472,31 +566,59 @@ const Auth = {
                 viagens: [], financas: [], metas: [], checklist: [],
                 criadoEm: new Date().toISOString()
             });
-            Estado.casalId = user.uid;
             return user.uid;
         }
         const data = snap.data();
-        Estado.casalId = data.casalIdRef || user.uid;
-        return Estado.casalId;
+        return data.casalIdRef || user.uid;
+    },
+
+    // O listener e os caches pertencem à sessão autenticada. Só os encerramos
+    // depois que o Firebase confirmar o sign-out; cada etapa é best effort para
+    // que uma falha de limpeza não impeça a navegação após uma saída bem-sucedida.
+    _limparSessaoAposLogout: () => {
+        try {
+            if (Estado.unsubscribe) Estado.unsubscribe();
+        } catch {}
+        Estado.unsubscribe = null;
+        try { localStorage.removeItem(DB.chaveCache()); } catch {}
+        try { localStorage.removeItem('pd-casalId'); } catch {}
+    },
+
+    _finalizarLogout: (destino) => {
+        try {
+            Auth._limparSessaoAposLogout();
+        } finally {
+            window.location.href = destino;
+        }
+    },
+
+    _tratarFalhaLogout: (err) => {
+        try {
+            PlannerAuthErrors.registrarErroAuth(err, 'logout');
+        } finally {
+            UI.toast(
+                'Não foi possível sair',
+                'Sua sessão continua ativa. Tente novamente.',
+                'erro'
+            );
+        }
     },
 
     logout: () => {
         if (!confirm('Deseja encerrar a sessão?')) return;
-        if (Estado.unsubscribe) Estado.unsubscribe();
-        try { localStorage.removeItem(DB.chaveCache()); } catch {}
-        localStorage.removeItem('pd-casalId');
-        auth.signOut().then(() => window.location.href = 'auth.html');
+        return auth.signOut().then(
+            () => Auth._finalizarLogout('auth.html'),
+            Auth._tratarFalhaLogout
+        );
     },
 
     // Sai do sistema pela logo e retorna à landing page pública (index.html)
     sairParaLanding: () => {
         if (!confirm('Deseja mesmo sair do PlannerDuo?')) return;
-        if (Estado.unsubscribe) Estado.unsubscribe();
-        try { localStorage.removeItem(DB.chaveCache()); } catch {}
-        localStorage.removeItem('pd-casalId');
-        auth.signOut()
-            .then(() => { window.location.href = 'index.html'; })
-            .catch(() => { window.location.href = 'index.html'; });
+        return auth.signOut().then(
+            () => Auth._finalizarLogout('index.html'),
+            Auth._tratarFalhaLogout
+        );
     }
 };
 
@@ -646,7 +768,10 @@ const DB = {
                 Render.popularSelectMes();
                 Render.tudo();
             }, (err) => {
-                console.warn('Firestore onSnapshot erro:', err.code, err.message);
+                console.warn('[PlannerDuo firestore]', {
+                    evento: 'snapshot-indisponivel',
+                    erroRecebido: Boolean(err),
+                });
                 // Não trava o app — continua com dados do cache
             });
     },
@@ -2308,7 +2433,12 @@ const Render = {
 // INICIALIZAÇÃO
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-    Auth.iniciarObserver();
+    // Só registra o observer depois que SESSION foi aplicada. Timeout/falha é
+    // terminal para esta instância do Auth e exige recarregamento.
+    persistenciaAuth.then((pronta) => {
+        if (pronta) Auth.iniciarObserver();
+        else Auth._falharBootstrap('autenticacao');
+    });
 
     // Filtros de finanças
     document.querySelectorAll('.filter-tab').forEach(btn => {
