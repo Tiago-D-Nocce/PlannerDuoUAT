@@ -101,7 +101,7 @@ This plan follows the existing bugfix sequence: Tasks 1 and 2 independently esta
   - If preview differs from local assets or any check fails, do not publish production; correct locally and return to Task 1 or 2 if the bug/preservation model changes.
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [-] 6. Publish production and perform public post-release checks (manual approval gate)
+- [x] 6. Publish production and perform public post-release checks (manual approval gate)
   - **STOP FOR A SECOND EXPLICIT APPROVAL** after preview evidence is reviewed. Production publication is high risk and must remain a human-authorized action.
   - Capture the current Hosting release identifier/time from the Firebase Hosting release history for rollback; do not inspect Auth users or Firestore documents.
   - After approval, publish only Hosting with `firebase deploy --only hosting --project plannerduo`. Do not commit, push or deploy any other Firebase service as part of this task.
