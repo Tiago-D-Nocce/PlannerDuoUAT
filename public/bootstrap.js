@@ -1,8 +1,9 @@
 // bootstrap.js — supervisor mínimo e independente do carregamento do PlannerDuo.
 //
-// Ele é carregado antes do Firebase para transformar falhas de SDK, scripts ou
-// inicialização em um estado visível e recuperável, em vez de deixar a tela em
-// um loader infinito. Não registra objetos de erro nem dados do usuário.
+// Ele é carregado antes do Firebase para transformar falhas explícitas de
+// recursos obrigatórios ou da inicialização em recuperação visível. Limites de
+// fase sinalizam demora recuperável; não fabricam uma falha da operação real.
+// Não registra objetos de erro nem dados do usuário.
 (function (root, factory) {
   const api = factory();
   const supervisor = api.criarSupervisorBootstrap({
@@ -25,11 +26,14 @@
 
   const MENSAGEM_APP = 'Não foi possível iniciar o PlannerDuo. Verifique sua conexão e tente novamente.';
   const MENSAGEM_AUTH = 'Não foi possível carregar a autenticação. Verifique sua conexão e tente novamente.';
+  const MENSAGEM_DEMORA_APP = 'A inicialização está demorando mais que o esperado. Você pode aguardar ou tentar novamente.';
+  const MENSAGEM_DEMORA_AUTH = 'A autenticação está demorando mais que o esperado. Você pode aguardar ou tentar novamente.';
   const CATEGORIAS = new Set([
     'timeout',
     'recurso',
     'sdk',
     'autenticacao',
+    'armazenamento',
     'firestore',
     'inicializacao',
   ]);
@@ -45,6 +49,7 @@
     let estado = 'ocioso';
     let temporizador = null;
     let ouvindo = false;
+    let avisoDemoraAtivo = false;
 
     const porId = (id) => documento && typeof documento.getElementById === 'function'
       ? documento.getElementById(id)
@@ -58,7 +63,6 @@
     function removerOuvintes() {
       if (!ouvindo || !janela || typeof janela.removeEventListener !== 'function') return;
       janela.removeEventListener('error', aoErroGlobal, true);
-      janela.removeEventListener('unhandledrejection', aoRejeicaoGlobal);
       ouvindo = false;
     }
 
@@ -69,6 +73,64 @@
 
     function categoriaSegura(valor) {
       return CATEGORIAS.has(valor) ? valor : 'inicializacao';
+    }
+
+    function mostrarDemora() {
+      avisoDemoraAtivo = true;
+      if (pagina === 'auth') {
+        const painel = porId('auth-bootstrap-error');
+        const detalhe = porId('auth-bootstrap-detail');
+        if (detalhe) detalhe.textContent = MENSAGEM_DEMORA_AUTH;
+        if (painel) {
+          painel.hidden = false;
+          if (painel.dataset) painel.dataset.estado = 'demorado';
+        }
+        return;
+      }
+
+      const loader = porId('loader-tela');
+      const mensagem = porId('loader-msg');
+      const acoes = porId('loader-acoes');
+      if (loader) {
+        if (loader.dataset) loader.dataset.estado = 'demorado';
+        if (typeof loader.setAttribute === 'function') loader.setAttribute('aria-busy', 'false');
+      }
+      if (mensagem) mensagem.textContent = MENSAGEM_DEMORA_APP;
+      if (acoes) {
+        acoes.hidden = false;
+        if (acoes.style) acoes.style.display = 'flex';
+      }
+    }
+
+    function limparAvisoDemora(concluido = false) {
+      if (!avisoDemoraAtivo) return;
+      avisoDemoraAtivo = false;
+
+      if (pagina === 'auth') {
+        const painel = porId('auth-bootstrap-error');
+        const detalhe = porId('auth-bootstrap-detail');
+        if (detalhe && detalhe.textContent === MENSAGEM_DEMORA_AUTH) detalhe.textContent = '';
+        if (painel) {
+          painel.hidden = true;
+          if (painel.dataset) painel.dataset.estado = concluido ? 'pronto' : 'carregando';
+        }
+        return;
+      }
+
+      const loader = porId('loader-tela');
+      const mensagem = porId('loader-msg');
+      const acoes = porId('loader-acoes');
+      if (loader) {
+        if (loader.dataset) loader.dataset.estado = concluido ? 'pronto' : 'carregando';
+        if (typeof loader.setAttribute === 'function') {
+          loader.setAttribute('aria-busy', concluido ? 'false' : 'true');
+        }
+      }
+      if (mensagem && mensagem.textContent === MENSAGEM_DEMORA_APP) mensagem.textContent = '';
+      if (acoes) {
+        acoes.hidden = true;
+        if (acoes.style) acoes.style.display = 'none';
+      }
     }
 
     function mostrarFalha() {
@@ -98,8 +160,9 @@
     }
 
     function falhar(categoria = 'inicializacao') {
-      if (estado === 'pronto' || estado === 'erro') return false;
+      if (estado === 'pronto' || estado === 'erro' || estado === 'ocioso') return false;
       estado = 'erro';
+      avisoDemoraAtivo = false;
       finalizarEscuta();
       mostrarFalha();
 
@@ -121,20 +184,56 @@
     }
 
     function concluir() {
-      if (estado !== 'pendente') return false;
+      if (estado !== 'pendente' && estado !== 'demorado') return false;
       estado = 'pronto';
       finalizarEscuta();
+      limparAvisoDemora(true);
       return true;
     }
 
-    function aoErroGlobal(evento) {
-      const alvo = evento && evento.target;
-      const tag = alvo && typeof alvo.tagName === 'string' ? alvo.tagName.toLowerCase() : '';
-      falhar(tag === 'script' || tag === 'link' ? 'recurso' : 'inicializacao');
+    function demorar() {
+      if (estado !== 'pendente') return false;
+      temporizador = null;
+      estado = 'demorado';
+      mostrarDemora();
+      return true;
     }
 
-    function aoRejeicaoGlobal() {
-      falhar('inicializacao');
+    function recursoObrigatorio(alvo) {
+      const tag = alvo && typeof alvo.tagName === 'string' ? alvo.tagName.toLowerCase() : '';
+      if (tag !== 'script') return false;
+
+      let atributo = '';
+      try {
+        if (alvo.dataset && typeof alvo.dataset.bootstrapRequired === 'string') {
+          atributo = alvo.dataset.bootstrapRequired;
+        } else if (typeof alvo.getAttribute === 'function') {
+          atributo = alvo.getAttribute('data-bootstrap-required') || '';
+        }
+      } catch (_) {
+        return false;
+      }
+      return atributo === 'true';
+    }
+
+    function aoErroGlobal(evento) {
+      if (recursoObrigatorio(evento && evento.target)) falhar('recurso');
+    }
+
+    function agendarDemora(timeoutMs) {
+      limparTemporizador();
+      const limite = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 10000;
+      if (typeof agendar === 'function') temporizador = agendar(demorar, limite);
+    }
+
+    function iniciarFase(_nome, timeoutMs) {
+      if (estado !== 'pendente' && estado !== 'demorado') return false;
+      if (estado === 'demorado') {
+        limparAvisoDemora(false);
+        estado = 'pendente';
+      }
+      agendarDemora(timeoutMs);
+      return true;
     }
 
     function iniciar(opcoes = {}) {
@@ -144,14 +243,10 @@
 
       if (janela && typeof janela.addEventListener === 'function') {
         janela.addEventListener('error', aoErroGlobal, true);
-        janela.addEventListener('unhandledrejection', aoRejeicaoGlobal);
         ouvindo = true;
       }
 
-      const timeoutMs = Number.isFinite(opcoes.timeoutMs) && opcoes.timeoutMs > 0
-        ? opcoes.timeoutMs
-        : 10000;
-      if (typeof agendar === 'function') temporizador = agendar(() => falhar('timeout'), timeoutMs);
+      iniciarFase('recursos', opcoes.timeoutMs);
       return true;
     }
 
@@ -159,12 +254,14 @@
       return Object.freeze({ pagina, estado });
     }
 
-    return Object.freeze({ iniciar, concluir, falhar, estadoAtual });
+    return Object.freeze({ iniciar, iniciarFase, concluir, falhar, estadoAtual });
   }
 
   return Object.freeze({
     MENSAGEM_APP,
     MENSAGEM_AUTH,
+    MENSAGEM_DEMORA_APP,
+    MENSAGEM_DEMORA_AUTH,
     criarSupervisorBootstrap,
   });
 });

@@ -39,8 +39,14 @@ function elementoFalso() {
  * @returns {{Utils:object, DB:object, Estado:object, Auth:object}} objetos internos de app.js
  */
 function carregarApp() {
+  const ouvintesDocumento = new Map();
+  const metricas = { persistencias: 0, observers: 0 };
   const docFalso = {
-    addEventListener() {},
+    addEventListener(tipo, fn) {
+      const lista = ouvintesDocumento.get(tipo) || [];
+      lista.push(fn);
+      ouvintesDocumento.set(tipo, lista);
+    },
     getElementById: () => null,
     querySelector: () => null,
     querySelectorAll: () => [],
@@ -48,11 +54,18 @@ function carregarApp() {
     documentElement: { getAttribute: () => 'light', setAttribute() {} },
   };
 
-  const authFalso = () => ({
-    setPersistence: () => ({ catch() {} }),
-    onAuthStateChanged() {},
+  const authAdapter = {
+    setPersistence() {
+      metricas.persistencias += 1;
+      return Promise.resolve();
+    },
+    onAuthStateChanged() {
+      metricas.observers += 1;
+      return () => {};
+    },
     currentUser: null,
-  });
+  };
+  const authFalso = () => authAdapter;
   authFalso.Auth = { Persistence: { SESSION: 'session' } };
 
   const docRefFalso = {
@@ -99,13 +112,20 @@ function carregarApp() {
   // `const` de topo não vira propriedade do global; um segundo script no mesmo
   // contexto compartilha o escopo lexical e consegue reexportá-los.
   vm.runInContext('globalThis.__app = { Utils, DB, Estado, Auth };', contexto);
+  contexto.__app.__teste = {
+    contexto,
+    metricas,
+    emitirDocumento(tipo, evento = {}) {
+      for (const fn of ouvintesDocumento.get(tipo) || []) fn(evento);
+    },
+  };
   return contexto.__app;
 }
 
-let Utils, DB, Estado, Auth;
+let Utils, DB, Estado, Auth, Teste;
 
 beforeEach(() => {
-  ({ Utils, DB, Estado, Auth } = carregarApp());
+  ({ Utils, DB, Estado, Auth, __teste: Teste } = carregarApp());
 });
 
 describe('app.js carrega sem erro', () => {
@@ -175,6 +195,33 @@ describe('Auth._comTimeout', () => {
 
 describe('bootstrap autenticado do app', () => {
   const user = { uid: 'usuario-1', email: 'pessoa@example.invalid', displayName: 'Pessoa' };
+
+  it('inicia o observer diretamente sem reconfigurar persistência no app', () => {
+    Teste.emitirDocumento('DOMContentLoaded');
+
+    expect(Teste.metricas.observers).toBe(1);
+    expect(Teste.metricas.persistencias).toBe(0);
+  });
+
+  it('mantém o supervisor ativo e libera a trava quando a navegação lança', () => {
+    const chamadas = { fases: 0, conclusoes: 0, falhas: 0, destinos: [] };
+    Teste.contexto.PlannerBootstrap = {
+      iniciarFase() { chamadas.fases += 1; },
+      concluir() { chamadas.conclusoes += 1; },
+      falhar() { chamadas.falhas += 1; },
+      estadoAtual: () => ({ estado: 'pendente' }),
+    };
+    Teste.contexto.location.replace = () => { throw new Error('falha-local-de-navegacao'); };
+
+    expect(Auth._redirecionar('auth.html')).toBe(false);
+    expect(Auth._navegando).toBe(false);
+    expect(chamadas).toMatchObject({ fases: 1, conclusoes: 0, falhas: 1 });
+
+    Teste.contexto.location.replace = (destino) => { chamadas.destinos.push(destino); };
+    expect(Auth._redirecionar('auth.html')).toBe(true);
+    expect(chamadas.destinos).toEqual(['auth.html']);
+    expect(chamadas.conclusoes).toBe(0);
+  });
 
   it('resolverCasalId retorna o ID sem mutar o estado fora da corrida', async () => {
     await expect(Auth.resolverCasalId(user)).resolves.toBe(user.uid);
@@ -492,5 +539,179 @@ describe('DB.normalizar — viagens, metas, checklist, orçamentos', () => {
     expect(duas.metas).toEqual(uma.metas);
     expect(duas.checklist).toEqual(uma.checklist);
     expect(duas.orcamentos).toEqual(uma.orcamentos);
+  });
+});
+
+// Harness de montagem real com os seis canvases do produto, mas sem expor
+// window.Chart/global Chart. Isso representa uma CDN visual bloqueada sem
+// substituir Render.tudo(), os relatórios ou a remoção real do loader.
+function carregarMontagemSemChart() {
+  const canvasIds = [
+    'chart-fluxo',
+    'chart-categorias',
+    'chart-responsavel',
+    'chart-cat-fin',
+    'chart-rel-evolucao',
+    'chart-rel-categorias',
+  ];
+  const elementos = new Map();
+  const adicionar = (id) => {
+    const elemento = elementoFalso();
+    elemento.id = id;
+    elementos.set(id, elemento);
+    return elemento;
+  };
+
+  for (const id of [
+    'sidebar-user-name',
+    'sidebar-avatar',
+    'loader-tela',
+    'tela-app',
+    'stat-saldo',
+    'welcome-msg',
+    'rel-periodo',
+    'rel-pessoa',
+    'rel-tbody',
+  ]) adicionar(id);
+  for (const id of canvasIds) {
+    const canvas = adicionar(id);
+    canvas.getContext = () => ({ canvasId: id });
+  }
+
+  elementos.get('loader-tela').style.display = 'flex';
+  elementos.get('tela-app').style.opacity = '0';
+  elementos.get('rel-periodo').value = '6';
+  elementos.get('rel-pessoa').value = 'todos';
+
+  const timers = new Map();
+  let proximoTimer = 1;
+  const agendar = (fn, atraso = 0) => {
+    const id = proximoTimer++;
+    timers.set(id, { fn, atraso });
+    return id;
+  };
+  const cancelar = (id) => timers.delete(id);
+  const executarTimers = () => {
+    while (timers.size) {
+      const [id, timer] = [...timers.entries()]
+        .sort((a, b) => a[1].atraso - b[1].atraso || a[0] - b[0])[0];
+      timers.delete(id);
+      timer.fn();
+    }
+  };
+
+  const documento = {
+    addEventListener() {},
+    getElementById: (id) => elementos.get(id) || null,
+    querySelector: (seletor) => seletor === '.view.ativa' ? { id: 'relatorios' } : null,
+    querySelectorAll: () => [],
+    createElement: () => elementoFalso(),
+    documentElement: { getAttribute: () => 'light', setAttribute() {} },
+  };
+
+  const authAdapter = {
+    currentUser: null,
+    onAuthStateChanged: () => () => {},
+    signOut: () => Promise.resolve(),
+  };
+  const authFalso = () => authAdapter;
+  authFalso.Auth = { Persistence: { SESSION: 'session' } };
+
+  const docRefFalso = {
+    get: async () => ({ exists: true, data: () => ({}) }),
+    set: async () => {},
+    update: async () => {},
+    onSnapshot: () => () => {},
+  };
+  const firestoreFalso = () => ({ collection: () => ({ doc: () => docRefFalso }) });
+  firestoreFalso.FieldValue = {
+    arrayUnion: (valor) => valor,
+    arrayRemove: (valor) => valor,
+  };
+
+  const contexto = {
+    console,
+    crypto,
+    Intl,
+    Date,
+    Math,
+    JSON,
+    setTimeout: agendar,
+    clearTimeout: cancelar,
+    URL,
+    Blob: class {},
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    document: documento,
+    location: { pathname: '/app', replace() {} },
+    navigator: { clipboard: { writeText: async () => {} } },
+    firebase: {
+      apps: [],
+      initializeApp() { this.apps.push({}); },
+      auth: authFalso,
+      firestore: firestoreFalso,
+    },
+  };
+  contexto.window = contexto;
+  contexto.globalThis = contexto;
+
+  const supervisor = {
+    estado: 'pendente',
+    conclusoes: 0,
+    iniciarFase() {},
+    estadoAtual() { return { estado: this.estado }; },
+    concluir() {
+      this.conclusoes += 1;
+      this.estado = 'pronto';
+      return true;
+    },
+    falhar() {
+      this.estado = 'erro';
+      return true;
+    },
+  };
+  contexto.PlannerBootstrap = supervisor;
+
+  vm.createContext(contexto);
+  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'auth-errors.js'), 'utf8'), contexto, { filename: 'auth-errors.js' });
+  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'core.js'), 'utf8'), contexto, { filename: 'core.js' });
+  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'app.js'), 'utf8'), contexto, { filename: 'app.js' });
+  vm.runInContext('globalThis.__montagem = { Auth, Estado, Charts, Relatorios };', contexto);
+
+  return {
+    ...contexto.__montagem,
+    contexto,
+    elementos,
+    canvasIds,
+    supervisor,
+    executarTimers,
+  };
+}
+
+describe('montagem autenticada sem Chart.js', () => {
+  it('mantém dashboard e relatórios funcionais, conclui o bootstrap e oculta o loader', () => {
+    const harness = carregarMontagemSemChart();
+    harness.Estado.casalId = 'espaco-opaco';
+
+    expect(Object.prototype.hasOwnProperty.call(harness.contexto, 'Chart')).toBe(false);
+    expect(harness.canvasIds.every((id) => typeof harness.elementos.get(id)?.getContext === 'function')).toBe(true);
+
+    expect(() => harness.Auth._entrarNoApp({
+      uid: 'usuario-opaco',
+      email: 'pessoa@example.invalid',
+      displayName: 'Pessoa',
+    })).not.toThrow();
+    // Exercita também os gráficos de finanças e os dois gráficos de relatório,
+    // além dos gráficos de dashboard já visitados pela montagem real.
+    expect(() => harness.Charts.renderizarTodos()).not.toThrow();
+
+    expect(harness.elementos.get('tela-app').style.opacity).toBe('1');
+    expect(harness.supervisor.estadoAtual().estado).toBe('pronto');
+    expect(harness.supervisor.conclusoes).toBe(1);
+    expect(harness.elementos.get('welcome-msg').textContent).toContain('Pessoa');
+    expect(harness.elementos.get('stat-saldo').textContent).not.toBe('');
+    expect(harness.elementos.get('rel-tbody').innerHTML).toContain('<tr>');
+
+    harness.executarTimers();
+    expect(harness.elementos.get('loader-tela').style.display).toBe('none');
   });
 });

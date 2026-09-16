@@ -166,36 +166,6 @@
     return CODIGOS_CANCELAMENTO.has(codigoBruto(error));
   }
 
-  /**
-   * Impõe um teto antes de iniciar qualquer operação que dependa da fila do
-   * Firebase Auth. O timeout não tenta cancelar a promessa original: o chamador
-   * deve tratar a falha como terminal e exigir recarregamento da página.
-   */
-  function limitarOperacaoAuth(promessa, timeoutMs, agendar, cancelar) {
-    const criarTimer = typeof agendar === 'function' ? agendar : setTimeout;
-    const removerTimer = typeof cancelar === 'function' ? cancelar : clearTimeout;
-    const limite = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 3000;
-
-    return new Promise((resolve, reject) => {
-      let encerrada = false;
-      let timer;
-      const finalizar = (destino, valor) => {
-        if (encerrada) return;
-        encerrada = true;
-        if (timer !== undefined) removerTimer(timer);
-        destino(valor);
-      };
-
-      timer = criarTimer(
-        () => finalizar(reject, Object.freeze({ code: 'auth/timeout' })),
-        limite
-      );
-      Promise.resolve(promessa).then(
-        (valor) => finalizar(resolve, valor),
-        (err) => finalizar(reject, err)
-      );
-    });
-  }
 
   return Object.freeze({
     MENSAGEM_CREDENCIAL,
@@ -204,6 +174,5 @@
     criarDiagnosticoErroAuth,
     registrarErroAuth,
     ehErroAuthCancelado,
-    limitarOperacaoAuth,
   });
 });

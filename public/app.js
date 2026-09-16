@@ -18,20 +18,9 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// SEGURANÇA: sessão válida apenas enquanto a aba estiver aberta. Ao fechar o
-// navegador ou abrir de novo pela landing, é necessário logar outra vez.
-// A persistência é requisito do bootstrap: uma falha/timeout não inicia o
-// observer atrás da mesma fila do Auth e deixa retry/login visíveis.
-const persistenciaAuth = PlannerAuthErrors.limitarOperacaoAuth(
-    auth.setPersistence(firebase.auth.Auth.Persistence.SESSION),
-    3000
-).then(
-    () => true,
-    (err) => {
-        PlannerAuthErrors.registrarErroAuth(err, 'persistencia');
-        return false;
-    }
-);
+// A política SESSION pertence somente ao fluxo que cria uma nova autenticação
+// em auth.html. Nesta página, uma sessão já estabelecida deve ser observada
+// diretamente; repetir setPersistence aqui bloquearia a própria restauração.
 
 // ── Estado Global ─────────────────────────────────────────────
 // O identificador do Espaço_Casal (casalId) é resolvido dinamicamente
@@ -364,6 +353,13 @@ function toggleTema() {
 const Auth = {
     _navegando: false,
 
+    _iniciarFase: (nome, timeoutMs) => {
+        const supervisor = window.PlannerBootstrap;
+        if (supervisor && typeof supervisor.iniciarFase === 'function') {
+            supervisor.iniciarFase(nome, timeoutMs);
+        }
+    },
+
     iniciarObserver: () => {
         try {
             return auth.onAuthStateChanged(
@@ -405,6 +401,9 @@ const Auth = {
         if (!isApp) return;
 
         Estado.usuarioNome = user.displayName || null;
+        // A restauração de dados tem contrato próprio. O fallback de 6 s
+        // continua decidindo o casalId sem herdar o tempo gasto por SDK/Auth.
+        Auth._iniciarFase('dados-compartilhados', 6500);
         try {
             Estado.casalId = await Auth._comTimeout(Auth.resolverCasalId(user), 6000);
         } catch (err) {
@@ -423,19 +422,32 @@ const Auth = {
 
         if (!Estado.casalId) Estado.casalId = user.uid;
         try { localStorage.setItem('pd-casalId', Estado.casalId); } catch {}
+        // A montagem síncrona também avança a fase, limpando qualquer aviso de
+        // demora dos dados antes de tornar o shell visível.
+        Auth._iniciarFase('renderizacao', 5000);
         // Qualquer exceção síncrona da montagem do shell sobe para o catch do
         // observer, que troca o loader por uma falha recuperável.
         Auth._entrarNoApp(user);
     },
 
     _redirecionar: (destino) => {
-        if (Auth._navegando) return;
+        if (Auth._navegando) return false;
         Auth._navegando = true;
-        if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
-        if (window.location && typeof window.location.replace === 'function') {
-            window.location.replace(destino);
-        } else {
-            window.location.href = destino;
+        // A página atual continua supervisionada até que o navegador realmente
+        // a abandone. Se ele permanecer aqui, a fase vira demora acionável.
+        Auth._iniciarFase('navegacao', 5000);
+        try {
+            if (!window.location) throw new Error('navigation-unavailable');
+            if (typeof window.location.replace === 'function') {
+                window.location.replace(destino);
+            } else {
+                window.location.href = destino;
+            }
+            return true;
+        } catch (_) {
+            Auth._navegando = false;
+            Auth._falharBootstrap('inicializacao');
+            return false;
         }
     },
 
@@ -1596,6 +1608,15 @@ const Exportacao = {
 // ============================================================
 const _charts = {};
 const Charts = {
+    // Chart.js é um recurso visual opcional. Todas as rotas de renderização
+    // passam por este único ponto para que CDN bloqueada/indisponível não
+    // interrompa a montagem do shell nem a renderização textual dos relatórios.
+    _criar: (ctx, config) => {
+        const ChartCtor = typeof globalThis !== 'undefined' ? globalThis.Chart : null;
+        if (!ctx || typeof ChartCtor !== 'function') return null;
+        return new ChartCtor(ctx, config);
+    },
+
     destruirTodos: () => {
         Object.keys(_charts).forEach(k => { try { _charts[k].destroy(); delete _charts[k]; } catch {} });
     },
@@ -1637,7 +1658,7 @@ const Charts = {
         const receitas  = meses.map(m => Estado.financas.filter(f => { const d = new Date(f.data+'T12:00:00'); return f.tipo==='receita' && d.getMonth()===m.mes && d.getFullYear()===m.ano; }).reduce((s,f)=>s+f.valor,0));
         const despesas  = meses.map(m => Estado.financas.filter(f => { const d = new Date(f.data+'T12:00:00'); return f.tipo==='despesa' && d.getMonth()===m.mes && d.getFullYear()===m.ano; }).reduce((s,f)=>s+f.valor,0));
 
-        _charts.fluxo = new Chart(ctx, {
+        _charts.fluxo = Charts._criar(ctx, {
             type: 'bar',
             data: {
                 labels: meses.map(m => m.label),
@@ -1670,7 +1691,7 @@ const Charts = {
         const labels = Object.keys(agrupado).map(c => Utils.catInfo(c).emoji + ' ' + Utils.catInfo(c).label);
         const data   = Object.values(agrupado);
 
-        _charts.categorias = new Chart(ctx, {
+        _charts.categorias = Charts._criar(ctx, {
             type: 'doughnut',
             data: { labels, datasets: [{ data, backgroundColor: Charts._cores(data.length), borderWidth: 2, borderColor: Charts._dark() ? '#1a2235' : '#fff' }] },
             options: {
@@ -1691,7 +1712,7 @@ const Charts = {
         const f1    = Estado.financas.filter(f => { const d=new Date(f.data+'T12:00:00'); return f.tipo==='despesa' && f.resp===n1 && d.getMonth()===mes && d.getFullYear()===ano; }).reduce((s,f)=>s+f.valor,0);
         const f2    = Estado.financas.filter(f => { const d=new Date(f.data+'T12:00:00'); return f.tipo==='despesa' && f.resp===n2 && d.getMonth()===mes && d.getFullYear()===ano; }).reduce((s,f)=>s+f.valor,0);
 
-        _charts.responsavel = new Chart(ctx, {
+        _charts.responsavel = Charts._criar(ctx, {
             type: 'bar',
             data: {
                 labels: [n1, n2],
@@ -1722,7 +1743,7 @@ const Charts = {
         const labels = Object.keys(agrupado).map(c => Utils.catInfo(c).emoji + ' ' + Utils.catInfo(c).label);
         const data   = Object.values(agrupado);
 
-        _charts.catFin = new Chart(ctx, {
+        _charts.catFin = Charts._criar(ctx, {
             type: 'doughnut',
             data: { labels, datasets: [{ data, backgroundColor: Charts._cores(data.length), borderWidth: 2, borderColor: Charts._dark() ? '#1a2235' : '#fff' }] },
             options: {
@@ -1783,7 +1804,7 @@ const Relatorios = {
             if (_charts.relEvolucao) _charts.relEvolucao.destroy();
             const deps = meses.map(m => Estado.financas.filter(f=>{ const d=new Date(f.data+'T12:00:00'); return f.tipo==='despesa' && d.getMonth()===m.mes && d.getFullYear()===m.ano && filtrarF(f); }).reduce((s,f)=>s+f.valor,0));
             const recs = meses.map(m => Estado.financas.filter(f=>{ const d=new Date(f.data+'T12:00:00'); return f.tipo==='receita' && d.getMonth()===m.mes && d.getFullYear()===m.ano && filtrarF(f); }).reduce((s,f)=>s+f.valor,0));
-            _charts.relEvolucao = new Chart(ctxEv, {
+            _charts.relEvolucao = Charts._criar(ctxEv, {
                 type: 'line',
                 data: {
                     labels: meses.map(m=>m.label),
@@ -1818,7 +1839,7 @@ const Relatorios = {
             });
             const labels = Object.keys(agrupado).map(c => Utils.catInfo(c).emoji+' '+Utils.catInfo(c).label);
             const data   = Object.values(agrupado);
-            _charts.relCat = new Chart(ctxCat, {
+            _charts.relCat = Charts._criar(ctxCat, {
                 type: 'doughnut',
                 data: { labels, datasets: [{ data, backgroundColor: Charts._cores(data.length), borderWidth:2, borderColor: Charts._dark()?'#1a2235':'#fff' }] },
                 options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ color:Charts._textColor(), font:{size:11}, padding:8 } } } }
@@ -2433,12 +2454,10 @@ const Render = {
 // INICIALIZAÇÃO
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // Só registra o observer depois que SESSION foi aplicada. Timeout/falha é
-    // terminal para esta instância do Auth e exige recarregamento.
-    persistenciaAuth.then((pronta) => {
-        if (pronta) Auth.iniciarObserver();
-        else Auth._falharBootstrap('autenticacao');
-    });
+    // A página do app apenas observa a sessão já estabelecida. SESSION é
+    // escolhida em auth.html antes de novas credenciais, sem um segundo gate.
+    Auth._iniciarFase('autenticacao', 10000);
+    Auth.iniciarObserver();
 
     // Filtros de finanças
     document.querySelectorAll('.filter-tab').forEach(btn => {

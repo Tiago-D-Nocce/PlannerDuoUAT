@@ -12,7 +12,6 @@ const {
   mensagemErroAuth,
   criarDiagnosticoErroAuth,
   registrarErroAuth,
-  limitarOperacaoAuth,
 } = authErrors;
 
 const PUBLIC = resolve(import.meta.dirname, '..', 'public');
@@ -78,41 +77,21 @@ describe('mensagens operacionais úteis e seguras', () => {
   });
 });
 
-describe('limite da persistência do Auth', () => {
-  it('não inicia login atrás de uma persistência que nunca conclui', async () => {
-    let dispararTimeout;
-    const timersCancelados = [];
-    const persistenciaPendente = new Promise(() => {});
-    const persistenciaLimitada = limitarOperacaoAuth(
-      persistenciaPendente,
-      3000,
-      (fn) => {
-        dispararTimeout = fn;
-        return 7;
-      },
-      (id) => timersCancelados.push(id)
-    );
-    let tentativasLogin = 0;
-    const login = persistenciaLimitada.then(() => { tentativasLogin += 1; });
+describe('falhas reais da política de persistência', () => {
+  it.each([
+    'auth/web-storage-unsupported',
+    'auth/unsupported-persistence-type',
+    'auth/missing-initial-state',
+  ])('classifica %s especificamente como armazenamento', (code) => {
+    const erro = { code, message: 'detalhe bruto privado' };
 
-    dispararTimeout();
-
-    await expect(login).rejects.toMatchObject({ code: 'auth/timeout' });
-    expect(tentativasLogin).toBe(0);
-    expect(timersCancelados).toEqual([7]);
+    expect(normalizarErroAuth(erro).categoria).toBe('armazenamento');
+    expect(mensagemErroAuth(erro).toLowerCase()).toMatch(/armazenamento|cookies/);
+    expect(mensagemErroAuth(erro)).not.toContain(erro.message);
   });
 
-  it('libera a operação e cancela o timer quando a persistência conclui', async () => {
-    const timersCancelados = [];
-    const resultado = limitarOperacaoAuth(
-      Promise.resolve('session'),
-      3000,
-      () => 11,
-      (id) => timersCancelados.push(id)
-    );
-
-    await expect(resultado).resolves.toBe('session');
-    expect(timersCancelados).toEqual([11]);
+  it('não expõe mais um helper que fabrique auth/timeout', () => {
+    expect(authErrors).not.toHaveProperty('limitarOperacaoAuth');
   });
 });
 
@@ -176,14 +155,14 @@ describe('integração dos assets compat', () => {
   ];
 
   function urlsFirebase(html) {
-    return [...html.matchAll(/<script src="(https:\/\/www\.gstatic\.com\/firebasejs\/[^"]+)"><\/script>/g)]
+    return [...html.matchAll(/<script src="(https:\/\/www\.gstatic\.com\/firebasejs\/[^"]+)"[^>]*><\/script>/g)]
       .map((match) => match[1]);
   }
 
   it.each(['auth.html', 'app.html'])('%s usa exatamente a mesma versão compat fixada', (arquivo) => {
     const html = lerPublic(arquivo);
     expect(urlsFirebase(html)).toEqual(urlsEsperadas);
-    expect(html).toContain('<script src="auth-errors.js"></script>');
+    expect(html).toContain('<script src="auth-errors.js" data-bootstrap-required="true"></script>');
   });
 
   it('auth.html passa o erro completo e não volta a silenciar persistência', () => {

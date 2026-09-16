@@ -204,17 +204,17 @@
 
 </div><!-- /.auth-page -->
 
-<script src="bootstrap.js" onerror="document.getElementById('auth-bootstrap-error').hidden=false;document.getElementById('auth-bootstrap-detail').textContent='Não foi possível carregar a autenticação. Verifique sua conexão e tente novamente.'"></script>
+<script src="bootstrap.js" data-bootstrap-required="true" onerror="document.getElementById('auth-bootstrap-error').hidden=false;document.getElementById('auth-bootstrap-detail').textContent='Não foi possível carregar a autenticação. Verifique sua conexão e tente novamente.'"></script>
 <script>
   if (window.PlannerBootstrap) {
     window.PlannerBootstrap.iniciar({ pagina: 'auth', timeoutMs: 10000 });
   }
 </script>
 <!-- Firebase SDKs: versão compat fixada para preservar firebase.auth()/firestore() -->
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
-<script src="auth-errors.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js" data-bootstrap-required="true"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js" data-bootstrap-required="true"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js" data-bootstrap-required="true"></script>
+<script src="auth-errors.js" data-bootstrap-required="true"></script>
 
 <script>
 /* ═══════════════════════════════════════════════
@@ -234,23 +234,38 @@ if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
 
-// SEGURANÇA: a sessão dura apenas enquanto a aba estiver aberta (SESSION), e
-// a persistência faz parte da inicialização. Se falhar ou não concluir no teto,
-// nenhuma operação de Auth começa atrás da mesma fila interna. A recuperação é
-// recarregar a página por meio do painel persistente.
-const persistenciaPronta = PlannerAuthErrors.limitarOperacaoAuth(
-  auth.setPersistence(firebase.auth.Auth.Persistence.SESSION),
-  3000
-).then(
+// SEGURANÇA: SESSION é a única política aceita antes de login, cadastro ou
+// redirect do Google. O limiar de 3 s apenas mostra demora recuperável; a
+// Promise real continua sendo aguardada, sem timeout sintético ou fallback
+// para LOCAL.
+if (window.PlannerBootstrap && typeof window.PlannerBootstrap.iniciarFase === 'function') {
+  window.PlannerBootstrap.iniciarFase('persistencia-session', 3000);
+}
+let operacaoPersistencia;
+try {
+  operacaoPersistencia = auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+} catch (err) {
+  operacaoPersistencia = Promise.reject(err);
+}
+const persistenciaPronta = Promise.resolve(operacaoPersistencia);
+
+// O handler de rejeição é ligado imediatamente para que a operação possuída
+// nunca produza uma unhandledrejection órfã. Os fluxos de credencial ainda
+// recebem a rejeição original ao aguardar persistenciaPronta.
+persistenciaPronta.then(
   () => {
     if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
   },
   (err) => {
+    const normalizado = PlannerAuthErrors.normalizarErroAuth(err);
     PlannerAuthErrors.registrarErroAuth(err, 'persistencia');
-    if (window.PlannerBootstrap) window.PlannerBootstrap.falhar('autenticacao');
+    if (window.PlannerBootstrap) {
+      window.PlannerBootstrap.falhar(
+        normalizado.categoria === 'armazenamento' ? 'armazenamento' : 'autenticacao'
+      );
+    }
     const detalhe = document.getElementById('auth-bootstrap-detail');
     if (detalhe) detalhe.textContent = PlannerAuthErrors.mensagemErroAuth(err);
-    throw err;
   }
 );
 
