@@ -40,7 +40,38 @@ function elementoFalso() {
  */
 function carregarApp() {
   const ouvintesDocumento = new Map();
-  const metricas = { persistencias: 0, observers: 0 };
+  const metricas = { persistencias: 0, observers: 0, observerNext: null, observerError: null };
+
+  // Timers híbridos: agendam num timer real (para caminhos que dependem de
+  // disparo automático, como _comTimeout) e também ficam rastreados para que
+  // avancarTempo possa forçá-los antecipadamente de forma determinística —
+  // usado para exercer o watchdog de login sem esperar 12 s reais.
+  const timers = new Map();
+  let proximoTimer = 1;
+  const agendar = (fn, atraso = 0) => {
+    const id = proximoTimer++;
+    const disparar = () => {
+      if (!timers.has(id)) return;
+      timers.delete(id);
+      clearTimeout(real);
+      fn();
+    };
+    const real = setTimeout(disparar, atraso);
+    if (real && typeof real.unref === 'function') real.unref();
+    timers.set(id, { atraso, disparar, real });
+    return id;
+  };
+  const cancelar = (id) => {
+    const timer = timers.get(id);
+    if (timer) { clearTimeout(timer.real); timers.delete(id); }
+  };
+  const avancarTempo = (ms) => {
+    // Dispara imediatamente todo timer cujo atraso seja <= ms, na ordem de
+    // agendamento, sem esperar o tempo real correspondente.
+    for (const [, timer] of [...timers.entries()]) {
+      if (timer.atraso <= ms) timer.disparar();
+    }
+  };
   const docFalso = {
     addEventListener(tipo, fn) {
       const lista = ouvintesDocumento.get(tipo) || [];
@@ -59,8 +90,12 @@ function carregarApp() {
       metricas.persistencias += 1;
       return Promise.resolve();
     },
-    onAuthStateChanged() {
+    // Guarda os callbacks para que os testes possam disparar o observer
+    // manualmente (sucesso ou erro), simulando um primeiro estado tardio.
+    onAuthStateChanged(onNext, onError) {
       metricas.observers += 1;
+      metricas.observerNext = typeof onNext === 'function' ? onNext : null;
+      metricas.observerError = typeof onError === 'function' ? onError : null;
       return () => {};
     },
     currentUser: null,
@@ -82,15 +117,17 @@ function carregarApp() {
     Date,
     Math,
     JSON,
-    setTimeout,
-    clearTimeout,
+    // Timers híbridos: disparam sozinhos no tempo real (preserva _comTimeout e
+    // UI.toast) e também podem ser forçados por avancarTempo (watchdog de login).
+    setTimeout: agendar,
+    clearTimeout: cancelar,
     URL,
     Blob: class {},
     Chart: class { destroy() {} },
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     document: docFalso,
     window: {},
-    location: { pathname: '/app', replace() {} },
+    location: { pathname: '/app', replace() { metricas.replaces = (metricas.replaces || 0) + 1; metricas.ultimoReplace = arguments[0]; } },
     navigator: { clipboard: { writeText() {} } },
     firebase: {
       apps: [],
@@ -118,6 +155,16 @@ function carregarApp() {
     emitirDocumento(tipo, evento = {}) {
       for (const fn of ouvintesDocumento.get(tipo) || []) fn(evento);
     },
+    // Dispara o callback de sucesso do observer registrado por iniciarObserver.
+    emitirEstadoAuth(user) {
+      if (metricas.observerNext) metricas.observerNext(user);
+    },
+    // Dispara o callback de erro do observer.
+    emitirErroAuth(err) {
+      if (metricas.observerError) metricas.observerError(err);
+    },
+    // Avança o relógio dos timers controláveis do contexto.
+    avancarTempo,
   };
   return contexto.__app;
 }
@@ -244,6 +291,58 @@ describe('bootstrap autenticado do app', () => {
     Auth._entrarNoApp = () => { throw new Error('falha-de-montagem'); };
 
     await expect(Auth._processarEstado(user)).rejects.toThrow('falha-de-montagem');
+  });
+});
+
+// Watchdog de login automático: quando o observer do Firebase demora demais
+// para o primeiro callback (notebook novo / rede lenta), o usuário não pode
+// ficar preso na tela de demora. Passado o orçamento de 12 s na rota do app,
+// assumimos ausência de sessão e navegamos para o login.
+describe('watchdog de login automático', () => {
+  const user = { uid: 'usuario-1', email: 'pessoa@example.invalid', displayName: 'Pessoa' };
+
+  it('navega para auth.html exatamente uma vez quando o observer não dispara em 12 s', () => {
+    Teste.emitirDocumento('DOMContentLoaded');
+    expect(Teste.metricas.replaces || 0).toBe(0);
+
+    Teste.avancarTempo(12000);
+
+    expect(Teste.metricas.replaces).toBe(1);
+    expect(Teste.metricas.ultimoReplace).toBe('auth.html');
+  });
+
+  it('cancela o watchdog quando o observer dispara com user null antes do prazo', () => {
+    Teste.emitirDocumento('DOMContentLoaded');
+
+    // Observer dispara sem sessão: _processarEstado redireciona para o login.
+    Teste.emitirEstadoAuth(null);
+    expect(Auth._observerDisparou).toBe(true);
+
+    // Mesmo avançando além do orçamento, o watchdog já foi cancelado: não pode
+    // haver navegação dupla — o único replace veio do próprio _processarEstado.
+    Teste.avancarTempo(12000);
+
+    expect(Teste.metricas.replaces).toBe(1);
+    expect(Teste.metricas.ultimoReplace).toBe('auth.html');
+  });
+
+  it('não navega para auth.html quando o observer dispara com user válido antes do prazo', async () => {
+    Auth.resolverCasalId = async () => 'casal-resolvido';
+    Auth._entrarNoApp = () => {};
+
+    Teste.emitirDocumento('DOMContentLoaded');
+
+    // Observer dispara com sessão válida antes do watchdog: o primeiro estado é
+    // registrado (cancelando o watchdog) e o app é montado, sem ir ao login.
+    // O callback do observer engole a promessa; aguardamos _processarEstado
+    // diretamente para deixar a montagem assíncrona assentar antes do relógio.
+    Teste.metricas.observerNext(user);
+    expect(Auth._observerDisparou).toBe(true);
+    await Auth._processarEstado(user);
+
+    Teste.avancarTempo(12000);
+
+    expect(Teste.metricas.replaces || 0).toBe(0);
   });
 });
 

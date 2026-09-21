@@ -353,6 +353,15 @@ function toggleTema() {
 const Auth = {
     _navegando: false,
 
+    // Marca se o observer de autenticação já emitiu o primeiro estado. Enquanto
+    // for false na página do app, o watchdog abaixo é a única saída garantida
+    // caso o SDK do Firebase demore demais para o primeiro callback.
+    _observerDisparou: false,
+
+    // Id do watchdog de login automático (setTimeout). Guardado para permitir
+    // cancelamento assim que o observer disparar.
+    _timerFallbackLogin: null,
+
     _iniciarFase: (nome, timeoutMs) => {
         const supervisor = window.PlannerBootstrap;
         if (supervisor && typeof supervisor.iniciarFase === 'function') {
@@ -360,15 +369,54 @@ const Auth = {
         }
     },
 
+    // Agenda/cancela o watchdog usando os timers da window quando disponíveis
+    // (navegador real) e caindo para os globais no contexto vm dos testes.
+    _agendar: (fn, ms) => {
+        const agendar = (typeof window !== 'undefined' && typeof window.setTimeout === 'function')
+            ? window.setTimeout
+            : setTimeout;
+        return agendar(fn, ms);
+    },
+
+    _cancelar: (id) => {
+        if (id == null) return;
+        const cancelar = (typeof window !== 'undefined' && typeof window.clearTimeout === 'function')
+            ? window.clearTimeout
+            : clearTimeout;
+        cancelar(id);
+    },
+
+    // Marca o primeiro disparo do observer e cancela o watchdog. Chamado ANTES
+    // de processar o estado, para que um observer que dispara logo neutralize o
+    // fallback antes de qualquer navegação própria.
+    _registrarPrimeiroEstado: () => {
+        Auth._observerDisparou = true;
+        Auth._cancelar(Auth._timerFallbackLogin);
+        Auth._timerFallbackLogin = null;
+    },
+
     iniciarObserver: () => {
+        // Orçamento generoso: se o primeiro estado de auth não chegar dentro
+        // dele na página do app, assumimos ausência de sessão (uma sessão real
+        // seria restaurada rapidamente do storage local) e vamos ao login em
+        // vez de deixar o usuário preso na tela de demora.
+        Auth._observerDisparou = false;
+        Auth._timerFallbackLogin = Auth._agendar(() => {
+            if (Auth._observerDisparou) return;
+            if (Utils.rotaDe(window.location.pathname) !== 'app') return;
+            Auth._redirecionar('auth.html');
+        }, 12000);
+
         try {
             return auth.onAuthStateChanged(
                 (user) => {
+                    Auth._registrarPrimeiroEstado();
                     Auth._processarEstado(user).catch(() => {
                         Auth._falharBootstrap('inicializacao');
                     });
                 },
                 (err) => {
+                    Auth._registrarPrimeiroEstado();
                     PlannerAuthErrors.registrarErroAuth(err, 'autenticacao');
                     Auth._falharBootstrap('autenticacao');
                 }

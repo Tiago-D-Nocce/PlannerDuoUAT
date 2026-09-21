@@ -11,7 +11,11 @@
     },
     "3.2 Verify the original exploration property now passes": {
       "status": "passed",
-      "lastRunTimestamp": 1789490639885
+      "lastRunTimestamp": 1789562575875
+    },
+    "3.3 Verify the preservation properties still pass": {
+      "status": "passed",
+      "lastRunTimestamp": 1789562597943
     }
   },
   "executionHistory": {
@@ -144,6 +148,11 @@
         "executionId": "bb10c917-068c-4fe4-a8c4-867eacb8da73",
         "chatSessionId": "sess_7b1ce5e7-44a2-4cd1-8753-dd3d0e917a79",
         "timestamp": 1789497101984
+      },
+      {
+        "executionId": "bb10c917-068c-4fe4-a8c4-867eacb8da73",
+        "chatSessionId": "sess_7b1ce5e7-44a2-4cd1-8753-dd3d0e917a79",
+        "timestamp": 1789562188515
       }
     ],
     "3. Fix the Firebase Auth bootstrap stall": [
