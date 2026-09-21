@@ -515,6 +515,10 @@ function createAppHarness({
       auth: authFactory,
       firestore: firestoreFactory,
     },
+    // Esta exploração observa o caminho Firebase (observer + supervisor).
+    // modo-local-sem-firebase tornou 'local' o padrão; fixamos o modo firebase
+    // para preservar a baseline capturada contra o commit não corrigido.
+    PLANNERDUO_MODO: 'firebase',
   };
   context.window = context;
   context.globalThis = context;

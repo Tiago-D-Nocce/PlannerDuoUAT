@@ -3,6 +3,20 @@
 PlannerDuo de Produção — aplicação web privada para casais gerenciarem finanças
 compartilhadas, viagens e metas.
 
+## Como rodar (modo local)
+
+O PlannerDuo está em modo local: abre direto no painel, sem login, salvando no
+navegador (localStorage). O Firebase está desligado — para religar, troque
+`MODO` para `'firebase'` em `public/app.js`.
+
+- **Recomendado (um clique):** no VS Code, pressione F5 e escolha
+  "PlannerDuo (local)". O servidor sobe e o navegador abre em
+  `http://localhost:5500/app.html`.
+- **Alternativa (terminal):** `npm run dev` e abra `http://localhost:5500/`.
+- **Live Server:** se usar a extensão, acesse por `app.html`/`index.html`
+  diretamente e **não** configure `mount` para `/app` — o Live Server casa o
+  mount por prefixo e captura `/app.js`, servindo-o como HTML e quebrando o app.
+
 ## Estrutura
 
 ```
@@ -26,7 +40,7 @@ O diretório servido é `public/`. Manter os assets na raiz faz o
 
 ```bash
 npm install
-npm run dev          # http://localhost:5000
+npm run dev          # http://localhost:5500
 ```
 
 O Firebase Auth não funciona sob `file://` — é preciso servir por HTTP.

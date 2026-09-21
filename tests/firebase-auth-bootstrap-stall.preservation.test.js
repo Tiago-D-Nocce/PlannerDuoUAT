@@ -537,6 +537,10 @@ function criarHarnessApp({
     URL,
     Blob: class {},
     Chart: class { destroy() {} },
+    // Preservação (Property 2): este harness observa o caminho Firebase
+    // (observer, resolverCasalId, signOut). modo-local-sem-firebase tornou
+    // 'local' o padrão, então fixamos o modo firebase para preservar o baseline.
+    PLANNERDUO_MODO: 'firebase',
   };
   contexto.window = contexto;
   contexto.globalThis = contexto;
@@ -546,6 +550,11 @@ function criarHarnessApp({
   vm.runInContext(AUTH_ERRORS_SOURCE, contexto, { filename: 'auth-errors.js' });
   vm.runInContext(CORE_SOURCE, contexto, { filename: 'core.js' });
   vm.runInContext(APP_SOURCE, contexto, { filename: 'app.js' });
+  // modo-local-sem-firebase moveu a inicialização do Firebase para
+  // iniciarFirebase(), antes feita no topo do módulo. Os cenários de preservação
+  // que exercitam auth/db diretamente (observer, resolverCasalId, signOut) sem
+  // passar por DOMContentLoaded precisam desse setup, idêntico ao antigo topo.
+  vm.runInContext('iniciarFirebase();', contexto);
   vm.runInContext(
     'globalThis.__plannerApp = { Utils, UI, Auth, DB, Estado, Render, ServicoBusca };',
     contexto

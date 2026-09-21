@@ -176,8 +176,14 @@ describe('integração do bootstrap com os assets', () => {
     for (const src of ['bootstrap.js', ...firebase, 'auth-errors.js']) {
       expect(tagDoScript(authHtml, src)).toContain('data-bootstrap-required="true"');
     }
-    for (const src of ['bootstrap.js', ...firebase, 'auth-errors.js', 'core.js', 'app.js']) {
+    // app.html (modo-local-sem-firebase): apenas os scripts obrigatórios nos dois
+    // modos permanecem fatais. Os SDKs Firebase e auth-errors.js passam a ser
+    // carregamento opcional para não travar o supervisor em modo local.
+    for (const src of ['bootstrap.js', 'core.js', 'app.js']) {
       expect(tagDoScript(appHtml, src)).toContain('data-bootstrap-required="true"');
+    }
+    for (const src of [...firebase, 'auth-errors.js']) {
+      expect(tagDoScript(appHtml, src)).not.toContain('data-bootstrap-required');
     }
     expect(tagDoScript(appHtml, 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'))
       .not.toContain('data-bootstrap-required');

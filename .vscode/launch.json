@@ -1,0 +1,21 @@
+{
+  // Rodar o PlannerDuo localmente sem depender da extensão Live Server.
+  // Pressione F5 (ou o botão "Run and Debug") e escolha "PlannerDuo (local)".
+  // O servidor sobe e o navegador abre sozinho em /app.html.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "PlannerDuo (local)",
+      "program": "${workspaceFolder}/scripts/dev-server.mjs",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "serverReadyAction": {
+        "pattern": "http://localhost:([0-9]+)/",
+        "uriFormat": "http://localhost:%s/app.html",
+        "action": "openExternally"
+      }
+    }
+  ]
+}

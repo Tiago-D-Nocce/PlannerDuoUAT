@@ -162,7 +162,13 @@ describe('integração dos assets compat', () => {
   it.each(['auth.html', 'app.html'])('%s usa exatamente a mesma versão compat fixada', (arquivo) => {
     const html = lerPublic(arquivo);
     expect(urlsFirebase(html)).toEqual(urlsEsperadas);
-    expect(html).toContain('<script src="auth-errors.js" data-bootstrap-required="true"></script>');
+    // auth.html mantém auth-errors.js obrigatório; app.html (modo-local-sem-firebase)
+    // torna esse recurso opcional (sem data-bootstrap-required) mantendo a tag.
+    if (arquivo === 'app.html') {
+      expect(html).toContain('<script src="auth-errors.js"></script>');
+    } else {
+      expect(html).toContain('<script src="auth-errors.js" data-bootstrap-required="true"></script>');
+    }
   });
 
   it('auth.html passa o erro completo e não volta a silenciar persistência', () => {

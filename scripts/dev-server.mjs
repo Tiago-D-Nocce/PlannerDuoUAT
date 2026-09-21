@@ -15,7 +15,7 @@ const RAIZ = resolve(import.meta.dirname, '..', 'public');
 
 const argPorta = process.argv.indexOf('--port');
 const PORTA = Number(
-  argPorta !== -1 ? process.argv[argPorta + 1] : process.env.PORT || 5000
+  argPorta !== -1 ? process.argv[argPorta + 1] : process.env.PORT || 5500
 );
 
 const TIPOS = {
@@ -88,7 +88,9 @@ const servidor = createServer(async (req, res) => {
   res.end(corpo);
 });
 
-servidor.listen(PORTA, () => {
-  console.log(`PlannerDuo servido em http://localhost:${PORTA}`);
-  console.log(`Raiz: ${RAIZ}`);
+servidor.listen(PORTA, 'localhost', () => {
+  console.log(`\n  PlannerDuo rodando (modo local, sem Firebase).`);
+  console.log(`  Abra:  http://localhost:${PORTA}/`);
+  console.log(`  App:   http://localhost:${PORTA}/app.html`);
+  console.log(`  (Ctrl+C para parar)\n`);
 });

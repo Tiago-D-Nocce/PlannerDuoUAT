@@ -1270,11 +1270,13 @@
     window.PlannerBootstrap.iniciar({ pagina: 'app', timeoutMs: 10000 });
   }
 </script>
-<!-- Firebase SDKs: versão compat fixada para preservar firebase.auth()/firestore() -->
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js" data-bootstrap-required="true"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js" data-bootstrap-required="true"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js" data-bootstrap-required="true"></script>
-<script src="auth-errors.js" data-bootstrap-required="true"></script>
+<!-- Firebase SDKs: versão compat fixada para preservar firebase.auth()/firestore().
+     Carregamento OPCIONAL (sem data-bootstrap-required): em modo local esses
+     recursos não são obrigatórios e sua ausência não deve disparar falhar('recurso'). -->
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script src="auth-errors.js"></script>
 <script src="core.js" data-bootstrap-required="true"></script>
 <script src="app.js" data-bootstrap-required="true"></script>
 </body>
