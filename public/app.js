@@ -14,9 +14,22 @@ const firebaseConfig = {
     measurementId: "G-GFCLFVXP4E"
 };
 
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
+// ── Modo de operação ─────────────────────────────────────────
+// 'local'    -> app abre sem login, persiste em localStorage (padrão)
+// 'firebase' -> fluxo de auth + Firestore como no comportamento original
+const MODO = (typeof window !== 'undefined' && window.PLANNERDUO_MODO) || 'local';
+const ehModoLocal = () => MODO === 'local';
+
+// Inicialização do Firebase sob demanda: nenhum acesso a `firebase.*` ocorre no
+// topo do módulo. `iniciarFirebase()` só roda no caminho firebase, então em
+// modo local a ausência dos SDKs não quebra a carga do app.js.
+let auth = null;
+let db   = null;
+function iniciarFirebase() {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db   = firebase.firestore();
+}
 
 // A política SESSION pertence somente ao fluxo que cria uma nova autenticação
 // em auth.html. Nesta página, uma sessão já estabelecida deve ser observada
@@ -536,6 +549,34 @@ const Auth = {
         );
     }),
 
+    // Entrada em modo local: prepara uma identidade sintética (casalId='local',
+    // sem conta nem e-mail) e reutiliza o caminho de montagem `_entrarNoApp`.
+    // Nenhum acesso a `firebase.*` ocorre aqui — o painel abre sem rede/login.
+    _entrarModoLocal: () => {
+        Estado.casalId     = 'local';
+        Estado.usuarioUid  = 'local';
+        Estado.usuarioEmail = null;
+
+        // Nomes locais vivem em chaves próprias (independentes do documento de
+        // dados); padrões estáveis Pessoa 1 / Pessoa 2 quando ausentes.
+        try {
+            Estado.nome1 = localStorage.getItem('pd-local-nome1') || 'Pessoa 1';
+            Estado.nome2 = localStorage.getItem('pd-local-nome2') || 'Pessoa 2';
+        } catch {
+            Estado.nome1 = 'Pessoa 1';
+            Estado.nome2 = 'Pessoa 2';
+        }
+
+        const usuarioLocal = { uid: 'local', email: '', displayName: Estado.nome1 || 'Pessoa 1' };
+        try {
+            Auth._entrarNoApp(usuarioLocal);
+        } catch (err) {
+            // Espelha o tratamento do observer: uma falha síncrona de montagem
+            // vira uma falha recuperável no supervisor em vez de loader preso.
+            Auth._falharBootstrap('inicializacao');
+        }
+    },
+
     _entrarNoApp: (user) => {
         // Sidebar: nome + inicial
         const email = typeof user.email === 'string' ? user.email : '';
@@ -787,6 +828,9 @@ const DB = {
     },
 
     ouvirNuvem: () => {
+        // Em modo local não há Firestore: sync é reler o próprio localStorage
+        // no reload (via carregarCache). Sem onSnapshot, sem dependência de rede.
+        if (ehModoLocal()) return;
         if (Estado.unsubscribe) Estado.unsubscribe();
         Estado.primeiroSnapshot = false;
         Estado.unsubscribe = db.collection('casais').doc(Estado.casalId)
@@ -836,7 +880,27 @@ const DB = {
             });
     },
 
+    // Documento completo do casal a partir do Estado — mesmo shape do doc
+    // Firestore, o que `carregarCache`/`normalizar` já entendem. A tarefa 6
+    // formaliza este caminho num adaptador Store/Local; por ora, em modo local,
+    // gravamos o documento inteiro em localStorage sob a chave de cache.
+    _docLocal: () => ({
+        financas:   Estado.financas,
+        viagens:    Estado.viagens,
+        metas:      Estado.metas,
+        checklist:  Estado.checklist,
+        orcamentos: Estado.orcamentos,
+        nome1:      Estado.nome1,
+        nome2:      Estado.nome2
+    }),
+
     salvar: async (campo) => {
+        // Caminho local direto (tarefa 6 formaliza isso num adaptador Store/Local):
+        // persiste o documento inteiro em localStorage, sem tocar no Firestore.
+        if (ehModoLocal()) {
+            try { localStorage.setItem(DB.chaveCache(), JSON.stringify(DB._docLocal())); } catch {}
+            return;
+        }
         try {
             await db.collection('casais').doc(Estado.casalId)
                 .set({ [campo]: Estado[campo] }, { merge: true });
@@ -846,6 +910,12 @@ const DB = {
     },
 
     salvarVarios: async (campos) => {
+        // Caminho local direto (ver comentário em DB.salvar): grava o documento
+        // completo em localStorage; a tarefa 6 substituirá isto pelo adaptador.
+        if (ehModoLocal()) {
+            try { localStorage.setItem(DB.chaveCache(), JSON.stringify(DB._docLocal())); } catch {}
+            return;
+        }
         const payload = {};
         campos.forEach(c => payload[c] = Estado[c]);
         try {
@@ -2502,10 +2572,18 @@ const Render = {
 // INICIALIZAÇÃO
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
-    // A página do app apenas observa a sessão já estabelecida. SESSION é
-    // escolhida em auth.html antes de novas credenciais, sem um segundo gate.
-    Auth._iniciarFase('autenticacao', 10000);
-    Auth.iniciarObserver();
+    if (ehModoLocal()) {
+        // Modo local: abre direto no painel, sem login e sem rede. Fase curta —
+        // a montagem é síncrona e conclui o bootstrap sem esperar o Firebase.
+        Auth._iniciarFase('local', 4000);
+        Auth._entrarModoLocal();
+    } else {
+        // A página do app apenas observa a sessão já estabelecida. SESSION é
+        // escolhida em auth.html antes de novas credenciais, sem um segundo gate.
+        iniciarFirebase();
+        Auth._iniciarFase('autenticacao', 10000);
+        Auth.iniciarObserver();
+    }
 
     // Filtros de finanças
     document.querySelectorAll('.filter-tab').forEach(btn => {

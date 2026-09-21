@@ -135,6 +135,10 @@ function carregarApp() {
       auth: authFalso,
       firestore: () => ({ collection: () => ({ doc: () => docRefFalso }) }),
     },
+    // Este harness exercita o caminho Firebase (observer, resolverCasalId sobre
+    // o Firestore stub). modo-local-sem-firebase tornou 'local' o padrão, então
+    // fixamos explicitamente o modo firebase para preservar o que este teste cobre.
+    PLANNERDUO_MODO: 'firebase',
   };
   contexto.window = contexto;
   contexto.globalThis = contexto;
@@ -145,6 +149,11 @@ function carregarApp() {
   vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'auth-errors.js'), 'utf8'), contexto, { filename: 'auth-errors.js' });
   vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'core.js'), 'utf8'), contexto, { filename: 'core.js' });
   vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'app.js'), 'utf8'), contexto, { filename: 'app.js' });
+
+  // modo-local-sem-firebase moveu a init do Firebase para iniciarFirebase().
+  // Este harness roda em modo firebase e chama Auth.resolverCasalId/observer
+  // diretamente, então inicializamos auth/db aqui (equivalente ao antigo topo).
+  vm.runInContext('iniciarFirebase();', contexto);
 
   // `const` de topo não vira propriedade do global; um segundo script no mesmo
   // contexto compartilha o escopo lexical e consegue reexportá-los.
