@@ -206,8 +206,9 @@ describe('integração do bootstrap com os assets', () => {
     expect(authHtml).toContain("iniciar({ pagina: 'auth', timeoutMs: 10000 })");
     expect(authHtml.match(/auth\.setPersistence\(/g)).toHaveLength(1);
     expect(authHtml).toContain('firebase.auth.Auth.Persistence.SESSION');
-    expect(authHtml).toContain('const persistenciaPronta = Promise.resolve(operacaoPersistencia)');
-    expect(authHtml).toContain('await persistenciaPronta');
+    expect(authHtml).toContain('let persistenciaPronta = Promise.resolve()');
+    expect(authHtml).toContain('persistenciaPronta = Promise.resolve(operacaoPersistencia)');
+    expect(authHtml).toContain('await comTimeout(persistenciaPronta, 8000)');
     expect(authHtml).not.toContain('PlannerAuthErrors.limitarOperacaoAuth(');
     expect(authHtml).not.toContain('Persistence.LOCAL');
     expect(authHtml).toContain("normalizado.categoria === 'armazenamento'");

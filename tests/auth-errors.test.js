@@ -155,20 +155,15 @@ describe('integração dos assets compat', () => {
   ];
 
   function urlsFirebase(html) {
-    return [...html.matchAll(/<script src="(https:\/\/www\.gstatic\.com\/firebasejs\/[^"]+)"[^>]*><\/script>/g)]
-      .map((match) => match[1]);
+    return urlsEsperadas.filter((url) => html.includes(url));
   }
 
-  it.each(['auth.html', 'app.html'])('%s usa exatamente a mesma versão compat fixada', (arquivo) => {
+  it.each(['auth.html', 'app.html'])('%s usa versão compat fixada somente no loader condicional', (arquivo) => {
     const html = lerPublic(arquivo);
     expect(urlsFirebase(html)).toEqual(urlsEsperadas);
-    // auth.html mantém auth-errors.js obrigatório; app.html (modo-local-sem-firebase)
-    // torna esse recurso opcional (sem data-bootstrap-required) mantendo a tag.
-    if (arquivo === 'app.html') {
-      expect(html).toContain('<script src="auth-errors.js"></script>');
-    } else {
-      expect(html).toContain('<script src="auth-errors.js" data-bootstrap-required="true"></script>');
-    }
+    for (const url of urlsEsperadas) expect(html.split(url)).toHaveLength(2);
+    expect(html).not.toMatch(/^\s*<script\s+src="https:\/\/www\.gstatic\.com/m);
+    expect(html).toContain('document.write(\'<script src="auth-errors.js"');
   });
 
   it('auth.html passa o erro completo e não volta a silenciar persistência', () => {
@@ -239,8 +234,11 @@ describe('regressão de saída da sessão', () => {
     const falha = trechoEntre(authHtml, 'function tratarFalhaTrocaConta(err) {', 'function trocarConta() {');
     const limpeza = trechoEntre(authHtml, 'function limparContaLocalAposLogout() {', 'function tratarFalhaTrocaConta');
 
+    expect(fluxo).toMatch(/if \(MODO_LOCAL\)[\s\S]*return auth\.signOut\(\)/);
+    expect(fluxo).toContain("localStorage.removeItem('pd-casalId')");
+    expect(fluxo).not.toMatch(/MODO_LOCAL[\s\S]*startsWith\('pd-cache:'\)/);
     expect(fluxo).toMatch(/return persistenciaPronta\s*\.then\(\(\) => auth\.signOut\(\)\)\s*\.then\(limparContaLocalAposLogout, tratarFalhaTrocaConta\);/);
-    expect(fluxo).not.toMatch(/localStorage|window\.location|\.catch\s*\(/);
+    expect(fluxo).not.toMatch(/window\.location|\.catch\s*\(/);
     expect(limpeza).toContain("localStorage.removeItem('pd-casalId')");
     expect(limpeza).toContain("k.startsWith('pd-cache:')");
     expect(falha).toContain("PlannerAuthErrors.registrarErroAuth(err, 'logout')");

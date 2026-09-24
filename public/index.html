@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PlannerDuo — O planejador do casal</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="runtime.js"></script>
+  <script>
+    if (window.PlannerRuntime && window.PlannerRuntime.isFirebase()) {
+      document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">');
+    } else {
+      document.documentElement.classList.add('icons-local');
+    }
+  </script>
   <link rel="stylesheet" href="style.css">
   <style>
     body { background: linear-gradient(160deg, #0b0f1a 0%, #0f1629 50%, #0b1220 100%); min-height: 100vh; }

@@ -31,7 +31,8 @@ const TIPOS = {
   '.woff2': 'font/woff2',
 };
 
-// Rewrites equivalentes aos de firebase.json.
+// Rewrites equivalentes aos de firebase.json. Em localhost, runtime.js mantém
+// contas e dados somente no navegador; este servidor não usa backend/Firebase.
 const REWRITES = { '/app': '/app.html', '/auth': '/auth.html' };
 
 /**
@@ -89,7 +90,8 @@ const servidor = createServer(async (req, res) => {
 });
 
 servidor.listen(PORTA, 'localhost', () => {
-  console.log(`\n  PlannerDuo rodando (modo local, sem Firebase).`);
+  console.log(`\n  PlannerDuo rodando em localhost.`);
+  console.log(`  Contas e dados ficam somente neste navegador (sem Firebase/backend).`);
   console.log(`  Abra:  http://localhost:${PORTA}/`);
   console.log(`  App:   http://localhost:${PORTA}/app.html`);
   console.log(`  (Ctrl+C para parar)\n`);

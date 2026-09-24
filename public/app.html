@@ -4,9 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PlannerDuo — Painel do Casal</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="runtime.js"></script>
+  <script>
+    if (window.PlannerRuntime && window.PlannerRuntime.isFirebase()) {
+      document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"><\/script>');
+    } else {
+      document.documentElement.classList.add('icons-local');
+    }
+  </script>
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div id="toast-container"></div>
@@ -109,10 +116,10 @@
     </nav>
 
     <div class="sidebar-footer">
-      <button class="btn-sidebar-action" onclick="toggleTema()" data-tip="Alternar tema" id="btn-tema">
+      <button class="btn-sidebar-action" onclick="toggleTema()" data-tip="Alternar tema" id="btn-tema" aria-label="Alternar tema" title="Alternar tema">
         <i class="fa-solid fa-moon"></i>
       </button>
-      <button class="btn-sidebar-action" onclick="Auth.logout()" data-tip="Sair">
+      <button class="btn-sidebar-action" onclick="Auth.logout()" data-tip="Sair" aria-label="Encerrar sessão" title="Encerrar sessão">
         <i class="fa-solid fa-right-from-bracket"></i>
       </button>
     </div>
@@ -123,11 +130,11 @@
 
     <!-- Mobile Header -->
     <div class="mobile-header">
-      <button class="btn-icon" onclick="abrirSidebar()">
+      <button class="btn-icon" onclick="abrirSidebar()" aria-label="Abrir menu" title="Abrir menu">
         <i class="fa-solid fa-bars"></i>
       </button>
       <div class="mobile-brand">Planner<span>Duo</span></div>
-      <button class="btn-icon" onclick="toggleTema()">
+      <button class="btn-icon" onclick="toggleTema()" aria-label="Alternar tema" title="Alternar tema">
         <i class="fa-solid fa-moon" id="mobile-tema-icon"></i>
       </button>
     </div>
@@ -654,7 +661,7 @@
         <div class="modal-title">Nova Transação 💳</div>
         <div class="modal-subtitle">Registre uma receita ou despesa</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-financa')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-financa')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <form id="form-financa">
@@ -781,7 +788,7 @@
         <div class="modal-title">Nova Viagem ✈️</div>
         <div class="modal-subtitle">Planeje os detalhes da próxima aventura</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-viagem')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-viagem')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <form id="form-viagem">
@@ -875,7 +882,7 @@
         <div class="modal-title" id="detalhe-titulo">Detalhes da Viagem</div>
         <div class="modal-subtitle" id="detalhe-datas">—</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-viagem-detalhe')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-viagem-detalhe')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body" id="modal-viagem-detalhe-body"></div>
   </div>
@@ -889,7 +896,7 @@
         <div class="modal-title">Nova Meta 🎯</div>
         <div class="modal-subtitle">Defina um objetivo financeiro do casal</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-meta')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-meta')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <form id="form-meta">
@@ -974,7 +981,7 @@
         <div class="modal-title">Adicionar ao Cofrinho 🐷</div>
         <div class="modal-subtitle" id="deposito-meta-nome">Meta</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-meta-deposito')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-meta-deposito')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -1003,7 +1010,7 @@
         <div class="modal-title">Cofrinho da Viagem 🐷</div>
         <div class="modal-subtitle" id="cofrinho-viagem-nome">Viagem</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-viagem-cofrinho')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-viagem-cofrinho')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -1032,7 +1039,7 @@
         <div class="modal-title">Limite Mensal 🎯</div>
         <div class="modal-subtitle">Defina um teto de gastos por categoria</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-orcamento')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-orcamento')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -1079,7 +1086,7 @@
         <div class="modal-title">Adicionar Item ✅</div>
         <div class="modal-subtitle">Adicione ao checklist de viagem</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-checklist-item')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-checklist-item')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -1120,7 +1127,7 @@
       <div>
         <div class="modal-title">Editar Transação ✏️</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-editar-financa')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-editar-financa')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="edit-fin-id">
@@ -1215,7 +1222,7 @@
         <div class="modal-title">Convidar parceiro(a) 💑</div>
         <div class="modal-subtitle">Gere um código e compartilhe com quem vai dividir o espaço</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-convite-gerar')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-convite-gerar')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <button class="btn btn-primary" style="width:100%" onclick="Convites.criar()">
@@ -1227,7 +1234,7 @@
         <i class="fa-solid fa-copy"></i> Copiar
       </button>
       <p style="font-size:0.8rem;color:var(--text-muted);margin-top:1rem;line-height:1.5">
-        O código expira em 72 horas. Seu parceiro(a) deve entrar com Google e usar "Entrar com código".
+        O código expira em 72 horas. No modo local, as duas contas devem usar este mesmo navegador e origem.
       </p>
     </div>
     <div class="modal-footer">
@@ -1244,7 +1251,7 @@
         <div class="modal-title">Entrar em um espaço 🔑</div>
         <div class="modal-subtitle">Digite o código que seu parceiro(a) compartilhou</div>
       </div>
-      <button class="modal-close" onclick="UI.fecharModal('modal-convite-aceitar')"><i class="fa-solid fa-xmark"></i></button>
+      <button class="modal-close" aria-label="Fechar" title="Fechar" onclick="UI.fecharModal('modal-convite-aceitar')"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal-body">
       <div class="form-group">
@@ -1270,14 +1277,17 @@
     window.PlannerBootstrap.iniciar({ pagina: 'app', timeoutMs: 10000 });
   }
 </script>
-<!-- Firebase SDKs: versão compat fixada para preservar firebase.auth()/firestore().
-     Carregamento OPCIONAL (sem data-bootstrap-required): em modo local esses
-     recursos não são obrigatórios e sua ausência não deve disparar falhar('recurso'). -->
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
-<script src="auth-errors.js"></script>
 <script src="core.js" data-bootstrap-required="true"></script>
+<script src="local.js" data-bootstrap-required="true"></script>
+<script>
+  // Recursos cloud fixos são inseridos somente fora de localhost.
+  if (window.PlannerRuntime && window.PlannerRuntime.isFirebase()) {
+    document.write('<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"><\/script>');
+    document.write('<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"><\/script>');
+    document.write('<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"><\/script>');
+    document.write('<script src="auth-errors.js"><\/script>');
+  }
+</script>
 <script src="app.js" data-bootstrap-required="true"></script>
 </body>
 </html>

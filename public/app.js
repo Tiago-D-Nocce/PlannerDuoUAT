@@ -15,9 +15,16 @@ const firebaseConfig = {
 };
 
 // ── Modo de operação ─────────────────────────────────────────
-// 'local'    -> app abre sem login, persiste em localStorage (padrão)
-// 'firebase' -> fluxo de auth + Firestore como no comportamento original
-const MODO = (typeof window !== 'undefined' && window.PLANNERDUO_MODO) || 'local';
+// PlannerRuntime detecta loopback como local e qualquer outro host como
+// Firebase. O fallback mantém compatibilidade com harnesses que injetam apenas
+// PLANNERDUO_MODO, sem tornar hosts remotos locais por padrão.
+const _modoExplicito = typeof window !== 'undefined' && ['local', 'firebase'].includes(window.PLANNERDUO_MODO)
+    ? window.PLANNERDUO_MODO
+    : null;
+const _host = typeof window !== 'undefined' && window.location ? String(window.location.hostname || '').toLowerCase() : '';
+const MODO = (typeof window !== 'undefined' && window.PlannerRuntime && window.PlannerRuntime.mode)
+    || _modoExplicito
+    || (['localhost', '127.0.0.1', '::1', '[::1]'].includes(_host) ? 'local' : 'firebase');
 const ehModoLocal = () => MODO === 'local';
 
 // Inicialização do Firebase sob demanda: nenhum acesso a `firebase.*` ocorre no
@@ -46,14 +53,17 @@ const Estado = {
     casalId: null,       // resolvido dinamicamente (Decisão D1)
     nome1: null,         // sem fallback fixo (null até carregar)
     nome2: null,
+    membros: {},         // mapa e-mail -> nome do espaço atual
     viagens:    [],
     financas:   [],
     metas:      [],
     checklist:  [],
     orcamentos: {},      // map categoria -> valor limite mensal
     historicoBuscas: [], // últimas buscas de viagem (max 8, localStorage)
-    unsubscribe: null,   // listener ativo do Firestore
-    primeiroSnapshot: false // true após o 1º onSnapshot com dados da nuvem
+    unsubscribe: null,   // listener ativo do Firestore ou storage local
+    primeiroSnapshot: false, // true após o 1º onSnapshot com dados da nuvem
+    _localRevision: 0,   // revisão observada do documento local
+    _localFieldRevisions: {} // última revisão observada de cada campo local
 };
 
 // ============================================================
@@ -549,30 +559,29 @@ const Auth = {
         );
     }),
 
-    // Entrada em modo local: prepara uma identidade sintética (casalId='local',
-    // sem conta nem e-mail) e reutiliza o caminho de montagem `_entrarNoApp`.
-    // Nenhum acesso a `firebase.*` ocorre aqui — o painel abre sem rede/login.
+    // Entrada local exige uma sessão criada em auth.html. Nenhuma identidade
+    // sintética é fabricada: cada conta mantém seu próprio espaço e cache.
     _entrarModoLocal: () => {
-        Estado.casalId     = 'local';
-        Estado.usuarioUid  = 'local';
-        Estado.usuarioEmail = null;
-
-        // Nomes locais vivem em chaves próprias (independentes do documento de
-        // dados); padrões estáveis Pessoa 1 / Pessoa 2 quando ausentes.
-        try {
-            Estado.nome1 = localStorage.getItem('pd-local-nome1') || 'Pessoa 1';
-            Estado.nome2 = localStorage.getItem('pd-local-nome2') || 'Pessoa 2';
-        } catch {
-            Estado.nome1 = 'Pessoa 1';
-            Estado.nome2 = 'Pessoa 2';
+        let user = null;
+        try { user = window.PlannerLocal.auth.currentUser(); } catch (_) {}
+        if (!user) {
+            Auth._redirecionar('auth.html');
+            return;
         }
 
-        const usuarioLocal = { uid: 'local', email: '', displayName: Estado.nome1 || 'Pessoa 1' };
+        Estado.usuarioUid = user.uid;
+        Estado.usuarioEmail = user.email;
+        Estado.usuarioNome = user.displayName || null;
         try {
-            Auth._entrarNoApp(usuarioLocal);
-        } catch (err) {
-            // Espelha o tratamento do observer: uma falha síncrona de montagem
-            // vira uma falha recuperável no supervisor em vez de loader preso.
+            Estado.casalId = PlannerCore.resolverCasalId(window.PlannerLocal.store, user);
+            const dados = window.PlannerLocal.store.getDoc('casais', Estado.casalId) || {};
+            Estado.membros = dados.membros || {};
+            Estado.nome1 = dados.nome1 || user.displayName || PlannerCore.nomePadrao(user.email);
+            Estado.nome2 = Utils.nome2De(dados, Estado.nome1);
+            Estado.nomeUsuario = Estado.membros[user.email] || user.displayName || PlannerCore.nomePadrao(user.email);
+            localStorage.setItem('pd-casalId', Estado.casalId);
+            Auth._entrarNoApp(user);
+        } catch (_) {
             Auth._falharBootstrap('inicializacao');
         }
     },
@@ -584,6 +593,8 @@ const Auth = {
         Estado.nomeUsuario = nome;
         document.getElementById('sidebar-user-name').textContent = nome;
         document.getElementById('sidebar-avatar').textContent    = Utils.inicial(nome);
+        const status = document.querySelector('.sidebar-user-status');
+        if (status) status.textContent = ehModoLocal() ? 'Dados locais' : 'Online';
 
         // Atualizar nomes nos selects
         UI.atualizarNomes();
@@ -594,9 +605,9 @@ const Auth = {
         // Popular select de mês nas finanças (depende dos dados já carregados)
         Render.popularSelectMes();
 
-        // As despesas recorrentes são processadas no primeiro snapshot da
-        // nuvem (DB.ouvirNuvem), não aqui: sobre o cache local o resultado
-        // seria descartado pelo snapshot seguinte.
+        // No backend local o cache já é a fonte de verdade, portanto recorrências
+        // podem ser materializadas imediatamente sem risco de snapshot posterior.
+        if (ehModoLocal()) Controladores.processarRecorrentes();
 
         // Popular selects de viagem e histórico de buscas
         Render.popularSelectViagens();
@@ -693,6 +704,23 @@ const Auth = {
         }
     },
 
+    _finalizarLogoutLocal: (destino) => {
+        try {
+            if (Estado.unsubscribe) Estado.unsubscribe();
+        } catch (_) {}
+        Estado.unsubscribe = null;
+        Estado.usuarioUid = null;
+        Estado.usuarioEmail = null;
+        Estado.usuarioNome = null;
+        Estado.nomeUsuario = null;
+        Estado.casalId = null;
+        Estado._localRevision = 0;
+        Estado._localFieldRevisions = {};
+        Estado.historicoBuscas = [];
+        try { localStorage.removeItem('pd-casalId'); } catch (_) {}
+        window.location.href = destino;
+    },
+
     _tratarFalhaLogout: (err) => {
         try {
             PlannerAuthErrors.registrarErroAuth(err, 'logout');
@@ -707,6 +735,12 @@ const Auth = {
 
     logout: () => {
         if (!confirm('Deseja encerrar a sessão?')) return;
+        if (ehModoLocal()) {
+            return window.PlannerLocal.auth.signOut().then(
+                () => Auth._finalizarLogoutLocal('auth.html'),
+                () => UI.toast('Não foi possível sair', 'Sua sessão local continua ativa. Tente novamente.', 'erro')
+            );
+        }
         return auth.signOut().then(
             () => Auth._finalizarLogout('auth.html'),
             Auth._tratarFalhaLogout
@@ -716,6 +750,12 @@ const Auth = {
     // Sai do sistema pela logo e retorna à landing page pública (index.html)
     sairParaLanding: () => {
         if (!confirm('Deseja mesmo sair do PlannerDuo?')) return;
+        if (ehModoLocal()) {
+            return window.PlannerLocal.auth.signOut().then(
+                () => Auth._finalizarLogoutLocal('index.html'),
+                () => UI.toast('Não foi possível sair', 'Sua sessão local continua ativa. Tente novamente.', 'erro')
+            );
+        }
         return auth.signOut().then(
             () => Auth._finalizarLogout('index.html'),
             Auth._tratarFalhaLogout
@@ -813,25 +853,73 @@ const DB = {
         Estado.orcamentos = n.orcamentos;
     },
 
+    _revisionDe: (dados) => {
+        const revisao = Number(dados && dados._revision);
+        return Number.isInteger(revisao) && revisao >= 0 ? revisao : 0;
+    },
+
+    _fieldRevisionsDe: (dados) => {
+        const origem = dados && dados._fieldRevisions;
+        if (!origem || typeof origem !== 'object' || Array.isArray(origem)) return {};
+        return Object.entries(origem).reduce((acc, [campo, valor]) => {
+            const revisao = Number(valor);
+            if (Number.isInteger(revisao) && revisao >= 0) acc[campo] = revisao;
+            return acc;
+        }, {});
+    },
+
+    _aplicarDocumentoLocal: (dados) => {
+        Estado.membros = dados.membros && typeof dados.membros === 'object' ? dados.membros : {};
+        if (dados.nome1) Estado.nome1 = dados.nome1;
+        const nome2 = Utils.nome2De(dados, Estado.nome1);
+        if (nome2) Estado.nome2 = nome2;
+        if (Estado.usuarioEmail && Estado.membros[Estado.usuarioEmail]) {
+            Estado.nomeUsuario = Estado.membros[Estado.usuarioEmail];
+            const elNome = document.getElementById('sidebar-user-name');
+            const elAv = document.getElementById('sidebar-avatar');
+            if (elNome) elNome.textContent = Estado.nomeUsuario;
+            if (elAv) elAv.textContent = Utils.inicial(Estado.nomeUsuario);
+        }
+        DB._aplicar(dados);
+        Estado._localRevision = DB._revisionDe(dados);
+        Estado._localFieldRevisions = DB._fieldRevisionsDe(dados);
+    },
+
+    _renderizarAtualizacaoLocal: () => {
+        UI.atualizarNomes();
+        Render.popularSelectMes();
+        Render.popularSelectViagens();
+        Render.tudo();
+    },
+
     carregarCache: () => {
         try {
             const raw = localStorage.getItem(DB.chaveCache());
             if (!raw) return;
             const dados = JSON.parse(raw);
-            if (dados.nome1) Estado.nome1 = dados.nome1;
-            // O cache guarda o documento inteiro, incluindo `membros`, então a
-            // derivação do nome da segunda pessoa vale aqui também.
-            const nome2Cache = Utils.nome2De(dados, Estado.nome1);
-            if (nome2Cache) Estado.nome2 = nome2Cache;
-            DB._aplicar(dados);
+            DB._aplicarDocumentoLocal(dados);
         } catch {}
     },
 
     ouvirNuvem: () => {
-        // Em modo local não há Firestore: sync é reler o próprio localStorage
-        // no reload (via carregarCache). Sem onSnapshot, sem dependência de rede.
-        if (ehModoLocal()) return;
         if (Estado.unsubscribe) Estado.unsubscribe();
+        Estado.unsubscribe = null;
+
+        if (ehModoLocal()) {
+            const chaveObservada = DB.chaveCache();
+            const receber = (evento) => {
+                if (!evento || evento.key !== chaveObservada || !evento.newValue) return;
+                let dados;
+                try { dados = JSON.parse(evento.newValue); } catch (_) { return; }
+                if (!dados || typeof dados !== 'object' || Array.isArray(dados)) return;
+                if (DB._revisionDe(dados) <= Estado._localRevision) return;
+                DB._aplicarDocumentoLocal(dados);
+                DB._renderizarAtualizacaoLocal();
+            };
+            window.addEventListener('storage', receber);
+            Estado.unsubscribe = () => window.removeEventListener('storage', receber);
+            return;
+        }
         Estado.primeiroSnapshot = false;
         Estado.unsubscribe = db.collection('casais').doc(Estado.casalId)
             .onSnapshot((doc) => {
@@ -840,6 +928,7 @@ const DB = {
                     return;
                 }
                 const dados = doc.data();
+                Estado.membros = dados.membros && typeof dados.membros === 'object' ? dados.membros : {};
                 if (dados.nome1) {
                     Estado.nome1 = dados.nome1;
                     // Atualiza nome do usuário logado pelo campo membros
@@ -880,48 +969,72 @@ const DB = {
             });
     },
 
-    // Documento completo do casal a partir do Estado — mesmo shape do doc
-    // Firestore, o que `carregarCache`/`normalizar` já entendem. A tarefa 6
-    // formaliza este caminho num adaptador Store/Local; por ora, em modo local,
-    // gravamos o documento inteiro em localStorage sob a chave de cache.
-    _docLocal: () => ({
-        financas:   Estado.financas,
-        viagens:    Estado.viagens,
-        metas:      Estado.metas,
-        checklist:  Estado.checklist,
-        orcamentos: Estado.orcamentos,
-        nome1:      Estado.nome1,
-        nome2:      Estado.nome2
-    }),
+    _camposPersistiveis: ['financas', 'viagens', 'metas', 'checklist', 'orcamentos', 'nome1', 'nome2', 'membros'],
+
+    _salvarLocal: (campos) => {
+        const solicitados = [...new Set(campos)].filter(campo => DB._camposPersistiveis.includes(campo));
+        if (!solicitados.length) return true;
+        try {
+            const atual = window.PlannerLocal.store.getDoc('casais', Estado.casalId);
+            if (!atual || typeof atual !== 'object') throw new Error('Documento local ausente');
+
+            const revisaoAtual = DB._revisionDe(atual);
+            const revisoesAtuais = DB._fieldRevisionsDe(atual);
+            const temMapaRevisoes = atual._fieldRevisions && typeof atual._fieldRevisions === 'object'
+                && !Array.isArray(atual._fieldRevisions);
+            const revisoesObservadas = Estado._localFieldRevisions || {};
+            const conflito = solicitados.some((campo) => {
+                const revisaoCampoAtual = Object.prototype.hasOwnProperty.call(revisoesAtuais, campo)
+                    ? revisoesAtuais[campo]
+                    : (!temMapaRevisoes && revisaoAtual > Estado._localRevision ? revisaoAtual : 0);
+                return revisaoCampoAtual > (Number(revisoesObservadas[campo]) || 0);
+            });
+
+            if (conflito) {
+                DB._aplicarDocumentoLocal(atual);
+                DB._renderizarAtualizacaoLocal();
+                UI.toast('Dados atualizados em outra aba. Repita sua alteração.', '', 'aviso');
+                return false;
+            }
+
+            const novaRevisao = Math.max(revisaoAtual, Estado._localRevision) + 1;
+            const payload = {};
+            solicitados.forEach((campo) => { payload[campo] = Estado[campo]; });
+            payload._revision = novaRevisao;
+            payload._updatedAt = new Date().toISOString();
+            payload._fieldRevisions = { ...revisoesAtuais };
+            solicitados.forEach((campo) => { payload._fieldRevisions[campo] = novaRevisao; });
+
+            window.PlannerLocal.store.updateDoc('casais', Estado.casalId, payload);
+            const incorporado = { ...atual, ...payload };
+            const haviaAtualizacaoExterna = revisaoAtual > Estado._localRevision;
+            DB._aplicarDocumentoLocal(incorporado);
+            if (haviaAtualizacaoExterna) DB._renderizarAtualizacaoLocal();
+            return true;
+        } catch (_) {
+            UI.toast('Erro ao salvar', 'Não foi possível persistir os dados neste navegador.', 'erro');
+            return false;
+        }
+    },
 
     salvar: async (campo) => {
-        // Caminho local direto (tarefa 6 formaliza isso num adaptador Store/Local):
-        // persiste o documento inteiro em localStorage, sem tocar no Firestore.
-        if (ehModoLocal()) {
-            try { localStorage.setItem(DB.chaveCache(), JSON.stringify(DB._docLocal())); } catch {}
-            return;
-        }
+        if (ehModoLocal()) return DB._salvarLocal([campo]);
         try {
             await db.collection('casais').doc(Estado.casalId)
                 .set({ [campo]: Estado[campo] }, { merge: true });
         } catch (err) {
-            UI.toast('Erro ao salvar', err.message, 'erro');
+            UI.toast('Erro ao salvar', 'Não foi possível sincronizar os dados. Tente novamente.', 'erro');
         }
     },
 
     salvarVarios: async (campos) => {
-        // Caminho local direto (ver comentário em DB.salvar): grava o documento
-        // completo em localStorage; a tarefa 6 substituirá isto pelo adaptador.
-        if (ehModoLocal()) {
-            try { localStorage.setItem(DB.chaveCache(), JSON.stringify(DB._docLocal())); } catch {}
-            return;
-        }
+        if (ehModoLocal()) return DB._salvarLocal(campos);
         const payload = {};
         campos.forEach(c => payload[c] = Estado[c]);
         try {
             await db.collection('casais').doc(Estado.casalId).set(payload, { merge: true });
         } catch (err) {
-            UI.toast('Erro ao salvar', err.message, 'erro');
+            UI.toast('Erro ao salvar', 'Não foi possível sincronizar os dados. Tente novamente.', 'erro');
         }
     }
 };
@@ -936,17 +1049,27 @@ const Convites = {
     // Gera um convite para o Espaço_Casal atual, grava convites/{codigo}
     // com validade de 72h e exibe o código no modal. Requirements: 4.1, 4.2, 4.3
     criar: async () => {
-        const codigo = PlannerCore.gerarCodigo();
-        const agora  = Date.now();
+        const agora = Date.now();
+        let codigo;
         try {
-            await db.collection('convites').doc(codigo).set({
-                casalId: Estado.casalId,
-                criadoPor: Estado.usuarioEmail,
-                criadoEm: new Date(agora).toISOString(),
-                expiraEm: new Date(agora + 72 * 60 * 60 * 1000).toISOString()
-            });
-        } catch (err) {
-            UI.toast('Erro ao gerar convite', err.message, 'erro');
+            if (ehModoLocal()) {
+                codigo = PlannerCore.criarConvite(
+                    window.PlannerLocal.store,
+                    Estado.casalId,
+                    Estado.usuarioEmail,
+                    agora
+                );
+            } else {
+                codigo = PlannerCore.gerarCodigo();
+                await db.collection('convites').doc(codigo).set({
+                    casalId: Estado.casalId,
+                    criadoPor: Estado.usuarioEmail,
+                    criadoEm: new Date(agora).toISOString(),
+                    expiraEm: new Date(agora + 72 * 60 * 60 * 1000).toISOString()
+                });
+            }
+        } catch (_) {
+            UI.toast('Erro ao gerar convite', 'Não foi possível salvar o convite.', 'erro');
             return null;
         }
         const campo = document.getElementById('convite-codigo-gerado');
@@ -962,15 +1085,48 @@ const Convites = {
     // Valida e processa o aceite de um convite (ordem de curto-circuito:
     // invalido -> expirou -> cheio -> ja_membro -> sucesso). Requirements: 4.4-4.9
     aceitar: async (codigo) => {
-        const user = auth.currentUser;
+        const user = ehModoLocal() ? window.PlannerLocal.auth.currentUser() : auth.currentUser;
         if (!user) return;
         const cod = (codigo || '').trim().toUpperCase();
         const mensagens = {
             invalido:  'Código inválido',
             expirou:   'Código expirou',
             cheio:     'Espaço do casal está cheio',
-            ja_membro: 'Você já é membro'
+            ja_membro: 'Você já é membro',
+            ja_vinculado: 'Você já participa de um espaço compartilhado.'
         };
+
+        if (ehModoLocal()) {
+            try {
+                const agora = Date.now();
+                const convite = window.PlannerLocal.store.getDoc('convites', cod);
+                const conviteValido = convite && new Date(convite.expiraEm).getTime() >= agora;
+                if (conviteValido && !window.PlannerLocal.store.canJoinSpace(user, convite.casalId)) {
+                    UI.toast(mensagens.ja_vinculado, '', 'aviso');
+                    return;
+                }
+                const resultado = PlannerCore.aceitarConvite(window.PlannerLocal.store, cod, user, agora);
+                if (!resultado.ok) {
+                    UI.toast(mensagens[resultado.erro] || 'Código inválido', '', resultado.erro === 'ja_membro' ? 'aviso' : 'erro');
+                    return;
+                }
+                Estado.casalId = resultado.casalId;
+                localStorage.setItem('pd-casalId', Estado.casalId);
+                const dados = window.PlannerLocal.store.getDoc('casais', Estado.casalId) || {};
+                DB._aplicarDocumentoLocal(dados);
+                UI.atualizarNomes();
+                Render.popularSelectMes();
+                Render.popularSelectViagens();
+                ServicoBusca.carregarHistorico();
+                DB.ouvirNuvem();
+                Render.tudo();
+                UI.fecharModal('modal-convite-aceitar');
+                UI.toast('Bem-vindo(a) ao espaço!', 'Vocês agora compartilham os dados locais.', 'sucesso');
+            } catch (_) {
+                UI.toast('Erro ao aceitar convite', 'Não foi possível processar o convite local.', 'erro');
+            }
+            return;
+        }
         try {
             // 1. Existência.
             const conviteSnap = await db.collection('convites').doc(cod).get();
@@ -1017,7 +1173,7 @@ const Convites = {
             DB.carregarCache();
             DB.ouvirNuvem();
         } catch (err) {
-            UI.toast('Erro ao aceitar convite', err.message, 'erro');
+            UI.toast('Erro ao aceitar convite', 'Não foi possível processar o convite. Tente novamente.', 'erro');
         }
     },
 
@@ -1405,16 +1561,27 @@ const Orcamentos = {
 // ============================================================
 const ServicoBusca = {
     // ── Histórico de buscas ──────────────────────────────────
+    _chaveHistorico: () => `pd-buscas:${Estado.casalId || 'sem-casal'}`,
+
     carregarHistorico: () => {
         try {
-            const raw = localStorage.getItem('pd-buscas');
+            let raw = localStorage.getItem(ServicoBusca._chaveHistorico());
+            // Migração simples do histórico global legado para o espaço atual.
+            if (!raw) {
+                raw = localStorage.getItem('pd-buscas');
+                if (raw) {
+                    localStorage.setItem(ServicoBusca._chaveHistorico(), raw);
+                    localStorage.removeItem('pd-buscas');
+                }
+            }
             Estado.historicoBuscas = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(Estado.historicoBuscas)) Estado.historicoBuscas = [];
         } catch { Estado.historicoBuscas = []; }
         ServicoBusca.renderHistorico();
     },
 
     _salvarHistorico: () => {
-        try { localStorage.setItem('pd-buscas', JSON.stringify(Estado.historicoBuscas)); } catch {}
+        try { localStorage.setItem(ServicoBusca._chaveHistorico(), JSON.stringify(Estado.historicoBuscas)); } catch {}
     },
 
     registrarBusca: (busca) => {
@@ -1583,7 +1750,7 @@ const ServicoBusca = {
                 url = `https://www.tripadvisor.com.br/Search?q=${dE}`;
                 break;
         }
-        if (url) window.open(url, '_blank');
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
     }
 };
 
@@ -2446,7 +2613,7 @@ const Render = {
                 <div class="trip-card-footer">
                     ${linkSeguro ? `<a href="${Utils.esc(linkSeguro)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="btn btn-ghost btn-sm"><i class="fa-solid fa-link"></i> Reserva</a>` : ''}
                     <button class="btn btn-success btn-sm" onclick="event.stopPropagation();Controladores.abrirCofrinhoViagem('${v.id}')"><i class="fa-solid fa-piggy-bank"></i> Guardar</button>
-                    <button class="btn btn-icon danger" onclick="event.stopPropagation();Controladores.deletar('viagens','${v.id}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-icon danger" aria-label="Excluir viagem" title="Excluir viagem" onclick="event.stopPropagation();Controladores.deletar('viagens','${v.id}')"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>`;
         }).join('');
@@ -2518,7 +2685,7 @@ const Render = {
                             ${m.desc ? `<div class="goal-desc">${Utils.esc(m.desc)}</div>` : ''}
                         </div>
                     </div>
-                    <button class="btn-icon danger" onclick="Controladores.deletar('metas','${m.id}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn-icon danger" aria-label="Excluir meta" title="Excluir meta" onclick="Controladores.deletar('metas','${m.id}')"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 <div class="goal-amounts">
                     <div class="goal-current">${Utils.moeda(m.atual||0)}</div>
@@ -2529,7 +2696,7 @@ const Render = {
                     <div class="progress-bar" style="width:${pct}%;background:${barGrad}"></div>
                 </div>
                 ${prazoHtml}
-                ${!concluida ? `<div class="savings-row"><input type="number" placeholder="Guardar R$..." min="0.01" step="0.01" id="dep-inline-${m.id}"><button class="btn btn-success btn-sm" onclick="Controladores._depositoInline('${m.id}')"><i class="fa-solid fa-piggy-bank"></i></button></div>` : `<div style="margin-top:10px"><span class="badge badge-success"><i class="fa-solid fa-check"></i> Concluída!</span></div>`}
+                ${!concluida ? `<div class="savings-row"><input type="number" placeholder="Guardar R$..." min="0.01" step="0.01" id="dep-inline-${m.id}"><button class="btn btn-success btn-sm" aria-label="Guardar valor na meta" title="Guardar valor" onclick="Controladores._depositoInline('${m.id}')"><i class="fa-solid fa-piggy-bank"></i></button></div>` : `<div style="margin-top:10px"><span class="badge badge-success"><i class="fa-solid fa-check"></i> Concluída!</span></div>`}
             </div>`;
         }).join('');
     },
@@ -2563,7 +2730,7 @@ const Render = {
                 </div>
                 <span class="check-text">${Utils.esc(c.texto)}</span>
                 <span class="check-category">${Utils.esc(c.cat)}</span>
-                <button class="btn-icon danger" style="width:28px;height:28px;font-size:.75rem" onclick="Checklist.remover('${c.id}')"><i class="fa-solid fa-xmark"></i></button>
+                <button class="btn-icon danger" aria-label="Remover item" title="Remover item" style="width:28px;height:28px;font-size:.75rem" onclick="Checklist.remover('${c.id}')"><i class="fa-solid fa-xmark"></i></button>
             </div>`).join('');
     }
 };

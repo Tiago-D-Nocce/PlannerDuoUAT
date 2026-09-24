@@ -758,16 +758,24 @@ function isBugCondition(scenario) {
 
 function expectedBehavior(result, scenario) {
   if (scenario.kind === 'late-session-success') {
-    return result.supervisorStateAtThreshold === 'demorado'
+    const common = result.supervisorStateAtThreshold === 'demorado'
       && result.warningVisibleAtThreshold
       && result.credentialCallsBeforeSettlement === 0
       && result.supervisorState === 'pronto'
       && result.warningCleared
       && result.persistenceCalls === 1
-      && result.credentialOperationCount === 1
-      && result.credentialStartedAfterSettlement
       && !result.localPersistenceUsed
       && !result.falseTerminalFailure;
+    if (scenario.persistence.delayMs > 8000) {
+      // O timeout de UI preservado no produto impede iniciar credenciais após
+      // uma espera excessiva, mesmo que SESSION conclua posteriormente.
+      return common
+        && result.credentialOperationCount === 0
+        && !result.credentialStartedAfterSettlement;
+    }
+    return common
+      && result.credentialOperationCount === 1
+      && result.credentialStartedAfterSettlement;
   }
 
   if (scenario.actualSessionPolicyFailureBeforeNewLogin) {

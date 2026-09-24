@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Entrar — PlannerDuo</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="runtime.js"></script>
+  <script>
+    if (window.PlannerRuntime && window.PlannerRuntime.isFirebase()) {
+      document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">');
+    } else {
+      document.documentElement.classList.add('icons-local');
+    }
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -119,7 +126,7 @@
 
         <div class="auth-divider">ou</div>
 
-        <button class="btn btn-ghost btn-block" onclick="loginGoogle()">
+        <button class="btn btn-ghost btn-block" id="btn-login-alternativo" onclick="loginGoogle()" title="Entrar com provedor ou perfil local">
           <svg width="18" height="18" viewBox="0 0 24 24" style="flex-shrink:0">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -179,7 +186,7 @@
       <!-- RESET DE SENHA -->
       <div id="secao-reset" class="auth-section">
         <div class="auth-form-title">Recuperar senha 🔑</div>
-        <p class="auth-form-sub">Informe o e-mail cadastrado e enviaremos um link de redefinição.</p>
+        <p class="auth-form-sub" id="reset-descricao">Informe o e-mail cadastrado e enviaremos um link de redefinição.</p>
 
         <form id="form-reset" novalidate>
           <div class="form-group">
@@ -189,8 +196,28 @@
               <input type="email" id="reset-email" placeholder="seuemail@exemplo.com" required>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block btn-lg">
-            <i class="fa-solid fa-paper-plane"></i> Enviar Link de Recuperação
+          <div class="form-group" id="reset-senha-atual-grupo" hidden>
+            <label class="form-label">Senha atual</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="reset-senha-atual" autocomplete="current-password">
+              <span class="password-toggle" onclick="togglePwd('reset-senha-atual', this)" title="Mostrar ou ocultar senha">
+                <i class="fa-regular fa-eye"></i>
+              </span>
+            </div>
+          </div>
+          <div class="form-group" id="reset-senha-grupo" hidden>
+            <label class="form-label">Nova senha</label>
+            <div class="input-wrap">
+              <i class="fa-solid fa-lock input-icon"></i>
+              <input type="password" id="reset-nova-senha" placeholder="Mínimo 6 caracteres" minlength="6">
+              <span class="password-toggle" onclick="togglePwd('reset-nova-senha', this)" title="Mostrar ou ocultar senha">
+                <i class="fa-regular fa-eye"></i>
+              </span>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="btn-reset">
+            <i class="fa-solid fa-paper-plane"></i> <span id="reset-botao-texto">Enviar Link de Recuperação</span>
           </button>
         </form>
 
@@ -210,64 +237,105 @@
     window.PlannerBootstrap.iniciar({ pagina: 'auth', timeoutMs: 10000 });
   }
 </script>
-<!-- Firebase SDKs: versão compat fixada para preservar firebase.auth()/firestore() -->
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js" data-bootstrap-required="true"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js" data-bootstrap-required="true"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js" data-bootstrap-required="true"></script>
-<script src="auth-errors.js" data-bootstrap-required="true"></script>
+<script src="core.js" data-bootstrap-required="true"></script>
+<script src="local.js" data-bootstrap-required="true"></script>
+<script>
+  // URLs fixas e controladas: o parser só recebe estes recursos no modo Firebase.
+  if (window.PlannerRuntime && window.PlannerRuntime.isFirebase()) {
+    document.write('<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js" data-bootstrap-required="true"><\/script>');
+    document.write('<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js" data-bootstrap-required="true"><\/script>');
+    document.write('<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js" data-bootstrap-required="true"><\/script>');
+    document.write('<script src="auth-errors.js" data-bootstrap-required="true"><\/script>');
+  }
+</script>
 
 <script>
 /* ═══════════════════════════════════════════════
    AUTH PAGE — script independente (sem app.js)
 ═══════════════════════════════════════════════ */
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyAywzg4yDP0p15RpnFwPc2Y2MGoT2U5l4M",
-  authDomain: "plannerduo.firebaseapp.com",
-  projectId: "plannerduo",
-  storageBucket: "plannerduo.firebasestorage.app",
-  messagingSenderId: "355035332668",
-  appId: "1:355035332668:web:9c91fb300c4b601dfc4339"
-};
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db   = firebase.firestore();
+const MODO_LOCAL = window.PlannerRuntime
+  ? window.PlannerRuntime.isLocal()
+  : window.PLANNERDUO_MODO === 'local';
+let auth = null;
+let db = null;
+let persistenciaPronta = Promise.resolve();
 
-// SEGURANÇA: SESSION é a única política aceita antes de login, cadastro ou
-// redirect do Google. O limiar de 3 s apenas mostra demora recuperável; a
-// Promise real continua sendo aguardada, sem timeout sintético ou fallback
-// para LOCAL.
-if (window.PlannerBootstrap && typeof window.PlannerBootstrap.iniciarFase === 'function') {
-  window.PlannerBootstrap.iniciarFase('persistencia-session', 3000);
-}
-let operacaoPersistencia;
-try {
-  operacaoPersistencia = auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
-} catch (err) {
-  operacaoPersistencia = Promise.reject(err);
-}
-const persistenciaPronta = Promise.resolve(operacaoPersistencia);
-
-// O handler de rejeição é ligado imediatamente para que a operação possuída
-// nunca produza uma unhandledrejection órfã. Os fluxos de credencial ainda
-// recebem a rejeição original ao aguardar persistenciaPronta.
-persistenciaPronta.then(
-  () => {
-    if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
-  },
-  (err) => {
-    const normalizado = PlannerAuthErrors.normalizarErroAuth(err);
-    PlannerAuthErrors.registrarErroAuth(err, 'persistencia');
-    if (window.PlannerBootstrap) {
-      window.PlannerBootstrap.falhar(
-        normalizado.categoria === 'armazenamento' ? 'armazenamento' : 'autenticacao'
-      );
-    }
-    const detalhe = document.getElementById('auth-bootstrap-detail');
-    if (detalhe) detalhe.textContent = PlannerAuthErrors.mensagemErroAuth(err);
+if (MODO_LOCAL) {
+  auth = window.PlannerLocal.auth;
+  db = window.PlannerLocal.store;
+  document.getElementById('login-sub').textContent = 'Entre com uma conta armazenada somente neste navegador.';
+  document.getElementById('reset-descricao').textContent = 'Confirme a senha atual e defina uma nova senha para esta conta local.';
+  document.getElementById('reset-senha-atual-grupo').hidden = false;
+  document.getElementById('reset-senha-atual').required = true;
+  document.getElementById('reset-senha-grupo').hidden = false;
+  document.getElementById('reset-nova-senha').required = true;
+  document.getElementById('reset-botao-texto').textContent = 'Redefinir senha local';
+  const alternativo = document.getElementById('btn-login-alternativo');
+  if (alternativo) {
+    alternativo.hidden = true;
+    alternativo.style.display = 'none';
   }
-);
+  if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
+} else {
+  const firebaseConfig = {
+    apiKey: "AIzaSyAywzg4yDP0p15RpnFwPc2Y2MGoT2U5l4M",
+    authDomain: "plannerduo.firebaseapp.com",
+    projectId: "plannerduo",
+    storageBucket: "plannerduo.firebasestorage.app",
+    messagingSenderId: "355035332668",
+    appId: "1:355035332668:web:9c91fb300c4b601dfc4339"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+
+  // SESSION é configurada uma única vez, antes de qualquer credencial Firebase.
+  if (window.PlannerBootstrap && typeof window.PlannerBootstrap.iniciarFase === 'function') {
+    window.PlannerBootstrap.iniciarFase('persistencia-session', 3000);
+  }
+  let operacaoPersistencia;
+  try {
+    operacaoPersistencia = auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+  } catch (err) {
+    operacaoPersistencia = Promise.reject(err);
+  }
+  persistenciaPronta = Promise.resolve(operacaoPersistencia);
+  persistenciaPronta.then(
+    () => {
+      if (window.PlannerBootstrap) window.PlannerBootstrap.concluir();
+    },
+    (err) => {
+      const normalizado = PlannerAuthErrors.normalizarErroAuth(err);
+      PlannerAuthErrors.registrarErroAuth(err, 'persistencia');
+      if (window.PlannerBootstrap) {
+        window.PlannerBootstrap.falhar(
+          normalizado.categoria === 'armazenamento' ? 'armazenamento' : 'autenticacao'
+        );
+      }
+      const detalhe = document.getElementById('auth-bootstrap-detail');
+      if (detalhe) detalhe.textContent = PlannerAuthErrors.mensagemErroAuth(err);
+    }
+  );
+}
+
+function mensagemErro(error, operacao) {
+  if (MODO_LOCAL) {
+    const permitidos = {
+      'auth/email-already-in-use': 'Este e-mail já está cadastrado no modo local.',
+      'auth/invalid-credential': 'E-mail ou senha inválidos.',
+      'auth/invalid-email': 'Informe um e-mail válido.',
+      'auth/weak-password': 'A senha deve ter no mínimo 6 caracteres.',
+      'auth/user-not-found': 'Conta local não encontrada para este e-mail.',
+      'local/crypto-unavailable': 'Este navegador não oferece criptografia segura para contas locais.',
+      'local/storage-unavailable': 'Permita o armazenamento do navegador para usar o modo local.',
+      'local/storage-corrupt': 'Os dados locais estão inválidos. Limpe os dados deste site para recomeçar.'
+    };
+    return permitidos[error && error.code] || 'Não foi possível concluir a operação local.';
+  }
+  PlannerAuthErrors.registrarErroAuth(error, operacao || 'autenticacao');
+  return PlannerAuthErrors.mensagemErroAuth(error);
+}
 
 // A autenticação bem-sucedida tem um único destino. `replace` evita que o botão
 // voltar reabra a tela de login com uma sessão ativa, e a trava impede chamadas
@@ -298,14 +366,17 @@ function limparContaLocalAposLogout() {
 }
 
 function tratarFalhaTrocaConta(err) {
-  try {
-    PlannerAuthErrors.registrarErroAuth(err, 'logout');
-  } finally {
-    toast('Não foi possível trocar de conta. Sua sessão continua ativa. Tente novamente.', 'erro');
-  }
+  if (!MODO_LOCAL) PlannerAuthErrors.registrarErroAuth(err, 'logout');
+  toast('Não foi possível trocar de conta. Sua sessão continua ativa. Tente novamente.', 'erro');
 }
 
 function trocarConta() {
+  if (MODO_LOCAL) {
+    return auth.signOut().then(() => {
+      try { localStorage.removeItem('pd-casalId'); } catch (_) {}
+      toast('Sessão local encerrada. Escolha outra conta.', 'info');
+    }, tratarFalhaTrocaConta);
+  }
   return persistenciaPronta
     .then(() => auth.signOut())
     .then(limparContaLocalAposLogout, tratarFalhaTrocaConta);
@@ -354,6 +425,7 @@ function toast(texto, tipo) {
 }
 
 function setBtnLoading(btn, sim) {
+  if (!btn) return;
   if (sim) {
     btn.disabled = true;
     btn.dataset.orig = btn.innerHTML;
@@ -368,8 +440,27 @@ function setBtnLoading(btn, sim) {
 // auth/internal-error e deixar o motivo real somente em `message`.
 // A mensagem bruta nunca é exibida nem registrada.
 function erroFirebase(error, operacao = 'autenticacao') {
-  PlannerAuthErrors.registrarErroAuth(error, operacao);
-  return PlannerAuthErrors.mensagemErroAuth(error);
+  return mensagemErro(error, operacao);
+}
+
+// Corrida com cancelamento do timer (análogo a Auth._comTimeout de app.js):
+// resolve/rejeita exatamente como a promessa original e nunca deixa um timeout
+// órfão após assentar. Garante que nenhuma operação de rede sem teto de tempo
+// mantenha o botão preso em "Aguarde..." para sempre.
+function comTimeout(promessa, ms) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    Promise.resolve(promessa).then(
+      (valor) => {
+        clearTimeout(timer);
+        resolve(valor);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
 }
 
 // ── LOGIN ─────────────────────────────────────
@@ -381,13 +472,15 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
   if (!email || !senha) { toast('Preencha e-mail e senha.', 'aviso'); return; }
   setBtnLoading(btn, true);
   try {
-    await persistenciaPronta;
-    await auth.signInWithEmailAndPassword(email, senha);
-    // Sucesso confirmado pelo Firebase: uma única navegação substitui a tela
-    // de login no histórico e não depende de callbacks concorrentes.
+    if (MODO_LOCAL) {
+      await auth.signIn(email, senha);
+    } else {
+      await comTimeout(persistenciaPronta, 8000);
+      await comTimeout(auth.signInWithEmailAndPassword(email, senha), 15000);
+    }
     irParaApp();
   } catch (err) {
-    toast(erroFirebase(err, 'login'), 'erro');
+    toast(mensagemErro(err, 'login'), 'erro');
     setBtnLoading(btn, false);
   }
 });
@@ -406,9 +499,16 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 
   setBtnLoading(btn, true);
   try {
-    // 1. Aguarda a configuração de sessão antes de criar a conta.
-    await persistenciaPronta;
-    const cred = await auth.createUserWithEmailAndPassword(email, senha);
+    if (MODO_LOCAL) {
+      await auth.createUser(email, senha, meuNome);
+      toast(`Bem-vindo(a), ${meuNome}! Entrando...`, 'sucesso');
+      setTimeout(irParaApp, 300);
+      return;
+    }
+
+    // Firebase: preserva os tetos atuais para nunca deixar o botão preso.
+    await comTimeout(persistenciaPronta, 8000);
+    const cred = await comTimeout(auth.createUserWithEmailAndPassword(email, senha), 15000);
     const uid  = cred.user.uid;
 
     // 2. Registra o Espaço_Casal próprio do Usuário (best-effort).
@@ -417,13 +517,16 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
     //    reconciliam este documento ao entrar no app.
     try {
       const docRef  = db.collection('casais').doc(uid);
-      const docSnap = await docRef.get();
+      // Cada operação Firestore tem teto de tempo: rede lenta ou regra que
+      // pendura a leitura/escrita apenas gera o console.warn best-effort abaixo
+      // e NÃO impede irParaApp.
+      const docSnap = await comTimeout(docRef.get(), 6000);
       if (docSnap.exists) {
         const membros = docSnap.data().membros || {};
         membros[email] = meuNome;
-        await docRef.update({ membros });
+        await comTimeout(docRef.update({ membros }), 6000);
       } else {
-        await docRef.set({
+        await comTimeout(docRef.set({
           nome1: meuNome,
           // O rótulo da segunda pessoa passa a ser derivado de `membros`
           // quando o convite é aceito. Gravar aqui um rótulo literal criava
@@ -432,7 +535,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
           membros: { [email]: meuNome },
           viagens: [], financas: [], metas: [], checklist: [],
           criadoEm: new Date().toISOString()
-        });
+        }), 6000);
       }
     } catch (fsErr) {
       // O cadastro no Auth já foi concluído; a reconciliação ocorrerá ao
@@ -448,7 +551,7 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
     setTimeout(irParaApp, 600);
 
   } catch (err) {
-    toast(erroFirebase(err, 'cadastro'), 'erro');
+    toast(mensagemErro(err, 'cadastro'), 'erro');
     setBtnLoading(btn, false);
   }
 });
@@ -456,44 +559,60 @@ document.getElementById('form-cadastro').addEventListener('submit', async (e) =>
 // ── RESET DE SENHA ────────────────────────────
 document.getElementById('form-reset').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const btn = document.getElementById('btn-reset');
   const email = document.getElementById('reset-email').value.trim();
+  const senhaAtual = document.getElementById('reset-senha-atual').value;
+  const novaSenha = document.getElementById('reset-nova-senha').value;
   if (!email) { toast('Informe o e-mail.', 'aviso'); return; }
+  if (MODO_LOCAL && !senhaAtual) { toast('Informe a senha atual.', 'aviso'); return; }
+  if (MODO_LOCAL && novaSenha.length < 6) { toast('A nova senha deve ter no mínimo 6 caracteres.', 'aviso'); return; }
+  setBtnLoading(btn, true);
   try {
-    await auth.sendPasswordResetEmail(email);
-    toast('Link enviado! Verifique sua caixa de entrada.', 'sucesso');
+    if (MODO_LOCAL) {
+      await auth.resetPassword(email, senhaAtual, novaSenha);
+      toast('Senha local redefinida. Faça login novamente.', 'sucesso');
+    } else {
+      await comTimeout(auth.sendPasswordResetEmail(email), 15000);
+      toast('Link enviado! Verifique sua caixa de entrada.', 'sucesso');
+    }
     trocarSecao('login');
   } catch (err) {
-    toast(erroFirebase(err, 'recuperacao-senha'), 'erro');
+    toast(mensagemErro(err, 'recuperacao-senha'), 'erro');
+  } finally {
+    setBtnLoading(btn, false);
   }
 });
 
-// ── GOOGLE ────────────────────────────────────
-// Usa signInWithRedirect — funciona em localhost e produção sem bloqueio de popup
+// ── LOGIN ALTERNATIVO ─────────────────────────
 async function loginGoogle() {
+  if (MODO_LOCAL) return;
+  const btn = document.getElementById('btn-login-alternativo');
+  setBtnLoading(btn, true);
   try {
-    await persistenciaPronta;
+    await comTimeout(persistenciaPronta, 8000);
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     auth.languageCode = 'pt-BR';
     await auth.signInWithRedirect(provider);
   } catch (err) {
-    toast(erroFirebase(err, 'google-login'), 'erro');
+    toast(mensagemErro(err, 'google-login'), 'erro');
+    setBtnLoading(btn, false);
   }
 }
 
-// Processa o resultado do redirect somente após definir a persistência.
-persistenciaPronta
-  .then(() => auth.getRedirectResult())
-  .then((result) => {
-    if (result && result.user) irParaApp();
-  })
-  .catch((err) => {
-    // Cancelamentos deliberados permanecem silenciosos. Qualquer outra falha
-    // passa inteira pelo normalizador, inclusive aliases legados do backend.
-    if (!PlannerAuthErrors.ehErroAuthCancelado(err)) {
-      toast(erroFirebase(err, 'google-redirect'), 'erro');
-    }
-  });
+// O redirect só existe no backend Firebase.
+if (!MODO_LOCAL) {
+  persistenciaPronta
+    .then(() => auth.getRedirectResult())
+    .then((result) => {
+      if (result && result.user) irParaApp();
+    })
+    .catch((err) => {
+      if (!PlannerAuthErrors.ehErroAuthCancelado(err)) {
+        toast(mensagemErro(err, 'google-redirect'), 'erro');
+      }
+    });
+}
 </script>
 </body>
 </html>

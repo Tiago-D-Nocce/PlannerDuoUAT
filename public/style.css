@@ -2,8 +2,7 @@
    PLANNERDUO — DESIGN SYSTEM PREMIUM v3.0
    ===================================================== */
 
-/* ── Google Fonts ──────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap');
+/* Fontes do sistema: evita qualquer requisição externa no modo local. */
 
 /* ── CSS Variables / Tokens ────────────────────────── */
 :root {
@@ -2120,3 +2119,24 @@ tbody td {
   .modal-overlay { align-items: flex-end; }
   .tab-btn { font-size: 0.75rem; padding: 8px 12px; }
 }
+
+/* Fallback sem Font Awesome: mantém ações locais visíveis sem baixar assets. */
+.icons-local i[class*="fa-"]::before { content: '•'; font-style: normal; font-family: system-ui, sans-serif; }
+.icons-local i.fa-xmark::before { content: '×'; }
+.icons-local i.fa-trash::before { content: '⌫'; }
+.icons-local i.fa-pen::before { content: '✎'; }
+.icons-local i.fa-plus::before { content: '+'; }
+.icons-local i.fa-bars::before { content: '☰'; }
+.icons-local i.fa-moon::before { content: '◐'; }
+.icons-local i.fa-sun::before { content: '☀'; }
+.icons-local i.fa-right-from-bracket::before,
+.icons-local i.fa-right-to-bracket::before,
+.icons-local i.fa-arrow-right-to-bracket::before { content: '→'; }
+.icons-local i.fa-piggy-bank::before { content: 'R$'; font-size: .7em; }
+.icons-local i.fa-key::before { content: '⌁'; }
+.icons-local i.fa-copy::before { content: '⧉'; }
+.icons-local i.fa-eye::before { content: '◉'; }
+.icons-local i.fa-eye-slash::before { content: '○'; }
+.icons-local i.fa-check::before,
+.icons-local i.fa-check-circle::before,
+.icons-local i.fa-check-double::before { content: '✓'; }
