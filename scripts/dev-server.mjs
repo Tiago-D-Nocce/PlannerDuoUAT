@@ -1,24 +1,19 @@
-// scripts/dev-server.mjs — servidor estático local, sem dependências.
-//
-// Reproduz o comportamento de Firebase Hosting declarado em firebase.json:
-// serve o diretório `public/` e aplica os mesmos rewrites (/app -> app.html,
-// /auth -> auth.html, resto -> index.html). Serve para abrir o PlannerDuo em
-// http://localhost (o Firebase Auth não funciona sob file://).
-//
-// Uso: npm run dev  [-- --port 5000]
+// Servidor estático local, sem dependências e sem acesso a serviços externos.
+// Uso: npm run dev -- --port 5500
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 
-const RAIZ = resolve(import.meta.dirname, '..', 'public');
+const ROOT = resolve(import.meta.dirname, '..', 'public');
+const portArgument = process.argv.indexOf('--port');
+const PORT = Number(portArgument !== -1 ? process.argv[portArgument + 1] : process.env.PORT || 5500);
 
-const argPorta = process.argv.indexOf('--port');
-const PORTA = Number(
-  argPorta !== -1 ? process.argv[argPorta + 1] : process.env.PORT || 5500
-);
+if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) {
+  throw new Error('Porta inválida. Use --port entre 0 e 65535.');
+}
 
-const TIPOS = {
+const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -26,73 +21,70 @@ const TIPOS = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
-  '.woff2': 'font/woff2',
 };
 
-// Rewrites equivalentes aos de firebase.json. Em localhost, runtime.js mantém
-// contas e dados somente no navegador; este servidor não usa backend/Firebase.
 const REWRITES = { '/app': '/app.html', '/auth': '/auth.html' };
 
-/**
- * Resolve o caminho da requisição para um arquivo dentro de `public/`,
- * recusando qualquer tentativa de escapar do diretório (path traversal).
- * @param {string} urlPath caminho da URL já decodificado
- * @returns {string|null} caminho absoluto seguro, ou null se sair da raiz
- */
-function caminhoSeguro(urlPath) {
-  const relativo = normalize(decodeURIComponent(urlPath)).replace(/^([/\\])+/, '');
-  const absoluto = join(RAIZ, relativo);
-  if (absoluto !== RAIZ && !absoluto.startsWith(RAIZ + sep)) return null;
-  return absoluto;
+function safePath(urlPath) {
+  let decoded;
+  try { decoded = decodeURIComponent(urlPath); } catch (_) { return null; }
+  const relative = normalize(decoded).replace(/^([/\\])+/, '');
+  const absolute = join(ROOT, relative);
+  if (absolute !== ROOT && !absolute.startsWith(ROOT + sep)) return null;
+  return absolute;
 }
 
-async function arquivo(caminho) {
+async function file(path) {
   try {
-    const info = await stat(caminho);
-    if (info.isDirectory()) return null;
-    return await readFile(caminho);
-  } catch {
+    const info = await stat(path);
+    if (!info.isFile()) return null;
+    return await readFile(path);
+  } catch (_) {
     return null;
   }
 }
 
-const servidor = createServer(async (req, res) => {
-  const urlPath = new URL(req.url, 'http://localhost').pathname;
-  const alvo = REWRITES[urlPath] || (urlPath === '/' ? '/index.html' : urlPath);
-
-  const caminho = caminhoSeguro(alvo);
-  if (!caminho) {
-    res.writeHead(403).end('Forbidden');
+const server = createServer(async (request, response) => {
+  const method = request.method || 'GET';
+  if (!['GET', 'HEAD'].includes(method)) {
+    response.writeHead(405, { Allow: 'GET, HEAD' }).end();
     return;
   }
 
-  let corpo = await arquivo(caminho);
-  let ext = extname(caminho);
-
-  // Fallback de SPA: qualquer rota desconhecida cai na landing, como no
-  // rewrite `"source": "**"` do firebase.json.
-  if (corpo === null) {
-    corpo = await arquivo(join(RAIZ, 'index.html'));
-    ext = '.html';
-    if (corpo === null) {
-      res.writeHead(404).end('Not found');
-      return;
-    }
+  const urlPath = new URL(request.url || '/', 'http://localhost').pathname;
+  const target = REWRITES[urlPath] || (urlPath === '/' ? '/index.html' : urlPath);
+  const path = safePath(target);
+  if (!path) {
+    response.writeHead(403).end('Forbidden');
+    return;
   }
 
-  res.writeHead(200, {
-    'Content-Type': TIPOS[ext] || 'application/octet-stream',
+  let body = await file(path);
+  let extension = extname(path);
+  if (body === null) {
+    body = await file(join(ROOT, 'index.html'));
+    extension = '.html';
+  }
+  if (body === null) {
+    response.writeHead(404).end('Not found');
+    return;
+  }
+
+  response.writeHead(200, {
+    'Content-Type': TYPES[extension] || 'application/octet-stream',
     'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
   });
-  res.end(corpo);
+  response.end(method === 'HEAD' ? undefined : body);
 });
 
-servidor.listen(PORTA, 'localhost', () => {
-  console.log(`\n  PlannerDuo rodando em localhost.`);
-  console.log(`  Contas e dados ficam somente neste navegador (sem Firebase/backend).`);
-  console.log(`  Abra:  http://localhost:${PORTA}/`);
-  console.log(`  App:   http://localhost:${PORTA}/app.html`);
-  console.log(`  (Ctrl+C para parar)\n`);
+server.listen(PORT, 'localhost', () => {
+  const address = server.address();
+  const activePort = typeof address === 'object' && address ? address.port : PORT;
+  console.log(`PlannerDuo rodando em http://localhost:${activePort}/`);
+  console.log('Dados salvos somente no navegador. Pressione Ctrl+C para encerrar.');
 });

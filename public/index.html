@@ -1,80 +1,39 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PlannerDuo — O planejador do casal</title>
-  <script src="runtime.js"></script>
-  <script>
-    if (window.PlannerRuntime && window.PlannerRuntime.isFirebase()) {
-      document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">');
-    } else {
-      document.documentElement.classList.add('icons-local');
-    }
-  </script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="description" content="Planner local para organizar finanças, viagens, metas e decisões sem conta ou servidor externo.">
+  <title>PlannerDuo — Planeje do seu jeito</title>
   <link rel="stylesheet" href="style.css">
-  <style>
-    body { background: linear-gradient(160deg, #0b0f1a 0%, #0f1629 50%, #0b1220 100%); min-height: 100vh; }
-    .landing-nav a { text-decoration: none; }
-    .btn-nav-outline {
-      padding: 9px 20px; border-radius: 10px; font-size: .875rem; font-weight: 600;
-      color: rgba(255,255,255,.7); border: 1.5px solid rgba(255,255,255,.18);
-      background: transparent; cursor: pointer; transition: all .2s;
-    }
-    .btn-nav-outline:hover { color:#fff; border-color:rgba(255,255,255,.45); background:rgba(255,255,255,.06); }
-  </style>
 </head>
-<body>
-
-<!-- Navbar -->
-<nav class="landing-nav">
-  <div class="landing-nav-logo" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="cursor:pointer" title="Início">
-    <div class="landing-nav-logo-icon">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path d="M12 21C12 21 3 14.5 3 8.5C3 5.42 5.42 3 8.5 3C10.07 3 11.5 3.72 12 4.5C12.5 3.72 13.93 3 15.5 3C18.58 3 21 5.42 21 8.5C21 14.5 12 21 12 21Z" fill="white"/>
-      </svg>
-    </div>
-    <div class="landing-nav-logo-text">Planner<span>Duo</span></div>
-  </div>
-  <div class="landing-cta-nav">
-    <a href="auth.html" class="btn btn-primary btn-sm" style="text-decoration:none">Acessar</a>
-  </div>
-</nav>
-
-<!-- Hero -->
-<section class="landing-hero" style="min-height:92vh">
-  <div class="landing-hero-orbs">
-    <div class="h-orb h-orb-1"></div>
-    <div class="h-orb h-orb-2"></div>
-    <div class="h-orb h-orb-3"></div>
-  </div>
-
-  <div class="landing-hero-tag">
-    <i class="fa-solid fa-lock"></i> Privado &amp; exclusivo do casal
-  </div>
-
-  <h1>
-    Planejem juntos,<br>
-    vivam <span class="grad-text">experiências</span><br>
-    inesquecíveis.
-  </h1>
-
-  <p>Finanças compartilhadas, viagens planejadas e metas alcançadas — tudo em um só lugar.</p>
-
-  <div class="landing-hero-btns">
-    <a href="auth.html" class="btn btn-orange btn-lg" style="text-decoration:none">
-      <i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar no PlannerDuo
+<body class="landing-body">
+  <nav class="landing-nav" aria-label="Navegação principal">
+    <a class="brand" href="index.html" aria-label="PlannerDuo — início">
+      <span class="brand-mark" aria-hidden="true">P</span>
+      <span class="brand-copy">Planner<span>Duo</span></span>
     </a>
-  </div>
-</section>
+    <a class="button soft" href="app.html">Abrir workspace</a>
+  </nav>
 
-<!-- Footer -->
-<footer class="landing-footer">
-  <div>
-    🩷 <strong style="color:rgba(255,255,255,.7)">PlannerDuo</strong>
-  </div>
-  <div style="color:rgba(255,255,255,.3)">© 2025 · PlannerDuo</div>
-</footer>
-
+  <main class="landing-hero">
+    <div class="landing-glow" aria-hidden="true"></div>
+    <div class="landing-content">
+      <span class="landing-pill"><i></i> 100% LOCAL · SEM LOGIN</span>
+      <h1>Planos compartilhados.<br><span>Decisões de verdade.</span></h1>
+      <p>Organize dinheiro, destinos, objetivos e votações em um workspace que começa vazio e se adapta às pessoas que você escolher.</p>
+      <div class="landing-actions">
+        <a class="button primary" href="app.html">Começar do zero →</a>
+        <a class="button soft" href="app.html#settings">Importar um backup</a>
+      </div>
+      <div class="landing-features">
+        <article class="landing-feature"><span>↕</span><strong>Finanças flexíveis</strong><p>Divida cada gasto entre qualquer combinação de participantes.</p></article>
+        <article class="landing-feature"><span>⌁</span><strong>Planos completos</strong><p>Viagens, metas e checklists conectados no mesmo lugar.</p></article>
+        <article class="landing-feature"><span>◇</span><strong>Decisões abertas</strong><p>Opções, votos transparentes e nenhum perfil predefinido.</p></article>
+        <article class="landing-feature"><span>◉</span><strong>Dados sob controle</strong><p>Persistência no navegador com exportação e restauração JSON.</p></article>
+      </div>
+    </div>
+  </main>
 </body>
 </html>

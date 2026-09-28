@@ -1,245 +1,475 @@
-// core.js — Lógica pura da feature multi-usuario-sso (PlannerDuo)
-//
-// Funções puras, desacopladas do Firebase, para permitir testes de propriedade
-// (fast-check + vitest) sem I/O real. As funções que dependem de persistência
-// recebem um `store` injetável (objeto em memória que simula o Firestore).
-//
-// Este arquivo funciona tanto como módulo Node (require, para testes) quanto
-// carregado no navegador via <script> (expõe window.PlannerCore).
+/* PlannerDuo — regras de domínio locais, sem dependências externas. */
+(function (root, factory) {
+  'use strict';
+  const api = factory(root);
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root && typeof root === 'object') root.PlannerCore = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
+  'use strict';
 
-// Alfabeto usado na geração de códigos de convite: A-Z (26) + 0-9 (10) = 36 símbolos.
-const ALFABETO_CODIGO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const SCHEMA_VERSION = 1;
+  const FORMAT = 'plannerduo-workspace';
+  const MAX_AMOUNT = 1_000_000_000;
+  const PALETTE = Object.freeze([
+    '#6366f1', '#f97316', '#14b8a6', '#ec4899', '#8b5cf6',
+    '#0ea5e9', '#22c55e', '#eab308', '#ef4444', '#64748b',
+  ]);
+  const CATEGORIES = Object.freeze([
+    'alimentacao', 'transporte', 'moradia', 'lazer', 'saude',
+    'viagem', 'educacao', 'vestuario', 'salario', 'investimento', 'outros',
+  ]);
 
-/**
- * Deriva a chave de Cache_Local a partir do identificador do Espaço_Casal.
- * Requirements: 2.6
- * @param {string} casalId identificador do Espaço_Casal
- * @returns {string} chave no formato `pd-cache:${casalId}`
- */
-function chaveCache(casalId) {
-  return `pd-cache:${casalId}`;
-}
-
-/**
- * Retorna o nome padrão de um Membro: a parte local do e-mail (antes do `@`).
- * Se não houver `@`, retorna o e-mail inteiro.
- * Requirements: 3.3
- * @param {string} email e-mail do Membro
- * @returns {string} parte local do e-mail, ou o e-mail inteiro se não houver `@`
- */
-function nomePadrao(email) {
-  const indice = email.indexOf('@');
-  return indice === -1 ? email : email.slice(0, indice);
-}
-
-/**
- * Gera um Código_Convite aleatório de 8 caracteres do alfabeto A-Z0-9.
- * Requirements: 4.1
- * @returns {string} código de exatamente 8 caracteres em A-Z0-9
- */
-function gerarCodigo() {
-  let codigo = '';
-  for (let i = 0; i < 8; i++) {
-    const indice = Math.floor(Math.random() * ALFABETO_CODIGO.length);
-    codigo += ALFABETO_CODIGO[indice];
+  function nowIso() {
+    return new Date().toISOString();
   }
-  return codigo;
-}
 
-// ---------------------------------------------------------------------------
-// Interface do `store` injetável (simula o Firestore em memória).
-//
-// As funções puras abaixo recebem um `store` como primeiro parâmetro. O store
-// abstrai a persistência, permitindo testar a lógica sem Firebase real. Ele
-// DEVE implementar três métodos:
-//
-//   getDoc(colecao, id) -> objeto|null
-//     Retorna os dados do documento `colecao/{id}`, ou `null` se não existir.
-//
-//   setDoc(colecao, id, dados) -> void
-//     Grava (substitui integralmente) o documento `colecao/{id}` com `dados`.
-//
-//   updateDoc(colecao, id, patch) -> void
-//     Mescla os campos de `patch` no documento `colecao/{id}` já existente
-//     (semântica de merge raso — apenas as chaves de `patch` são alteradas).
-//
-// Coleção usada por estas funções: `casais`, com documentos na forma de
-// Espaço_Casal completo ou de ponteiro `{ casalIdRef }` (ver design, Decisão D1).
-// ---------------------------------------------------------------------------
+  function id(prefix) {
+    const base = root && root.crypto && typeof root.crypto.randomUUID === 'function'
+      ? root.crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    return `${prefix || 'item'}-${base}`;
+  }
 
-/**
- * Cria um novo Espaço_Casal em `casais/{user.uid}` com o Criador como primeiro
- * Membro. O nome do Membro vem de `user.displayName`, caindo para
- * `nomePadrao(user.email)` quando ausente/nulo.
- * Requirements: 2.1, 2.2, 3.2, 6.2
- * @param {{getDoc:Function,setDoc:Function,updateDoc:Function}} store store injetável
- * @param {{uid:string,email:string,displayName?:string|null}} user usuário autenticado
- * @returns {string} o `casalId` criado (igual a `user.uid`)
- */
-function criarEspacoCasal(store, user) {
-  const nome = user.displayName || nomePadrao(user.email);
-  store.setDoc('casais', user.uid, {
-    membros: { [user.email]: nome },
-    nome1: nome,
-    nome2: null,
-    viagens: [],
-    financas: [],
-    metas: [],
-    checklist: [],
-    criadoEm: new Date().toISOString(),
+  function clone(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+  }
+
+  function text(value, fallback) {
+    const result = String(value == null ? '' : value).trim();
+    return result || (fallback || '');
+  }
+
+  function amount(value) {
+    let parsed;
+    if (typeof value === 'number') {
+      parsed = value;
+    } else {
+      let source;
+      try {
+        source = String(value == null ? '' : value).trim();
+      } catch (_) {
+        return 0;
+      }
+      parsed = Number(source.includes(',')
+        ? source.replace(/\./g, '').replace(',', '.')
+        : source);
+    }
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > MAX_AMOUNT) return 0;
+    const cents = Math.round(parsed * 100);
+    return Number.isSafeInteger(cents) ? cents / 100 : 0;
+  }
+
+  function date(value) {
+    const result = String(value || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(result)) return '';
+    const [year, month, day] = result.split('-').map(Number);
+    const parsed = new Date(year, month - 1, day, 12, 0, 0, 0);
+    if (Number.isNaN(parsed.getTime())
+      || parsed.getFullYear() !== year
+      || parsed.getMonth() !== month - 1
+      || parsed.getDate() !== day) return '';
+    return result;
+  }
+
+  function unique(values) {
+    return [...new Set((Array.isArray(values) ? values : []).filter(Boolean).map(String))];
+  }
+
+  function createEmptyWorkspace() {
+    const timestamp = nowIso();
+    return {
+      format: FORMAT,
+      schemaVersion: SCHEMA_VERSION,
+      id: 'workspace-local',
+      generation: id('generation'),
+      name: '',
+      participants: [],
+      finances: [],
+      trips: [],
+      goals: [],
+      checklist: [],
+      decisions: [],
+      budgets: {},
+      settings: {
+        currency: 'BRL',
+        defaultSplit: 'equal',
+        onboardingCompleted: false,
+      },
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      revision: 0,
+    };
+  }
+
+  function normalizeParticipant(item, index) {
+    if (!item || typeof item !== 'object') return null;
+    const name = text(item.name);
+    if (!name) return null;
+    return {
+      id: text(item.id) || id('participant'),
+      name,
+      color: /^#[0-9a-f]{6}$/i.test(String(item.color || ''))
+        ? String(item.color).toLowerCase()
+        : PALETTE[index % PALETTE.length],
+      active: item.active !== false,
+      createdAt: text(item.createdAt) || nowIso(),
+    };
+  }
+
+  function normalizeWorkspace(input) {
+    const raw = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    const base = createEmptyWorkspace();
+    const seen = new Set();
+    const participants = (Array.isArray(raw.participants) ? raw.participants : [])
+      .map(normalizeParticipant)
+      .filter(Boolean)
+      .map((participant) => {
+        if (!seen.has(participant.id)) {
+          seen.add(participant.id);
+          return participant;
+        }
+        const replacement = { ...participant, id: id('participant') };
+        seen.add(replacement.id);
+        return replacement;
+      });
+    const participantIds = new Set(participants.map((participant) => participant.id));
+
+    const finances = (Array.isArray(raw.finances) ? raw.finances : [])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const type = item.type === 'income' ? 'income' : 'expense';
+        const paidById = participantIds.has(String(item.paidById || ''))
+          ? String(item.paidById)
+          : null;
+        return {
+          id: text(item.id) || id('finance'),
+          type,
+          description: text(item.description),
+          amount: amount(item.amount),
+          date: date(item.date),
+          category: CATEGORIES.includes(item.category) ? item.category : 'outros',
+          paidById,
+          splitBetweenIds: unique(item.splitBetweenIds).filter((participantId) => participantIds.has(participantId)),
+          tripId: text(item.tripId) || null,
+          notes: text(item.notes),
+          recurring: Boolean(item.recurring),
+          recurringSourceId: text(item.recurringSourceId) || null,
+          recurrenceSeriesId: text(item.recurrenceSeriesId) || (item.recurring ? (text(item.id) || null) : null),
+          occurrenceMonth: /^\d{4}-\d{2}$/.test(String(item.occurrenceMonth || '')) ? String(item.occurrenceMonth) : null,
+          recurrenceSkippedMonths: unique(item.recurrenceSkippedMonths).filter((month) => /^\d{4}-\d{2}$/.test(month)),
+          createdAt: text(item.createdAt) || nowIso(),
+        };
+      })
+      .filter((item) => item.description && item.amount > 0 && item.date);
+
+    const trips = (Array.isArray(raw.trips) ? raw.trips : [])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        id: text(item.id) || id('trip'),
+        destination: text(item.destination),
+        emoji: text(item.emoji, '🧭').slice(0, 8),
+        startDate: date(item.startDate),
+        endDate: date(item.endDate),
+        budget: amount(item.budget),
+        saved: amount(item.saved),
+        notes: text(item.notes),
+        createdAt: text(item.createdAt) || nowIso(),
+      }))
+      .filter((item) => item.destination);
+    const tripIds = new Set(trips.map((trip) => trip.id));
+    finances.forEach((finance) => {
+      if (finance.tripId && !tripIds.has(finance.tripId)) finance.tripId = null;
+    });
+
+    const goals = (Array.isArray(raw.goals) ? raw.goals : [])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        id: text(item.id) || id('goal'),
+        title: text(item.title),
+        emoji: text(item.emoji, '🎯').slice(0, 8),
+        target: amount(item.target),
+        current: amount(item.current),
+        deadline: date(item.deadline),
+        description: text(item.description),
+        createdAt: text(item.createdAt) || nowIso(),
+      }))
+      .filter((item) => item.title && item.target > 0);
+
+    const checklist = (Array.isArray(raw.checklist) ? raw.checklist : [])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => ({
+        id: text(item.id) || id('check'),
+        text: text(item.text),
+        category: text(item.category, 'outros'),
+        done: Boolean(item.done),
+        tripId: tripIds.has(String(item.tripId || '')) ? String(item.tripId) : null,
+        createdAt: text(item.createdAt) || nowIso(),
+      }))
+      .filter((item) => item.text);
+
+    const decisions = (Array.isArray(raw.decisions) ? raw.decisions : [])
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const options = (Array.isArray(item.options) ? item.options : [])
+          .filter((option) => option && typeof option === 'object' && text(option.label))
+          .map((option) => ({
+            id: text(option.id) || id('option'),
+            label: text(option.label),
+            voterIds: unique(option.voterIds).filter((participantId) => participantIds.has(participantId)),
+          }));
+        const voterOwner = new Set();
+        options.forEach((option) => {
+          option.voterIds = option.voterIds.filter((participantId) => {
+            if (voterOwner.has(participantId)) return false;
+            voterOwner.add(participantId);
+            return true;
+          });
+        });
+        return {
+          id: text(item.id) || id('decision'),
+          title: text(item.title),
+          description: text(item.description),
+          status: item.status === 'closed' ? 'closed' : 'open',
+          options,
+          createdAt: text(item.createdAt) || nowIso(),
+          closedAt: item.status === 'closed' ? (text(item.closedAt) || nowIso()) : null,
+        };
+      })
+      .filter((item) => item.title && item.options.length >= 2);
+
+    const budgets = Object.entries(raw.budgets && typeof raw.budgets === 'object' ? raw.budgets : {})
+      .reduce((result, [category, value]) => {
+        const normalizedAmount = amount(value);
+        if (CATEGORIES.includes(category) && normalizedAmount > 0) result[category] = normalizedAmount;
+        return result;
+      }, {});
+
+    return {
+      ...base,
+      schemaVersion: SCHEMA_VERSION,
+      id: 'workspace-local',
+      generation: text(raw.generation) || base.generation,
+      name: text(raw.name),
+      participants,
+      finances,
+      trips,
+      goals,
+      checklist,
+      decisions,
+      budgets,
+      settings: {
+        currency: 'BRL',
+        defaultSplit: 'equal',
+        onboardingCompleted: Boolean(raw.settings && raw.settings.onboardingCompleted),
+      },
+      createdAt: text(raw.createdAt) || base.createdAt,
+      updatedAt: text(raw.updatedAt) || base.updatedAt,
+      revision: Number.isInteger(Number(raw.revision)) && Number(raw.revision) >= 0
+        ? Number(raw.revision)
+        : 0,
+    };
+  }
+
+  function createParticipant(data, index) {
+    const normalized = normalizeParticipant({
+      id: id('participant'),
+      name: data && data.name,
+      color: data && data.color,
+      active: true,
+      createdAt: nowIso(),
+    }, Number(index) || 0);
+    if (!normalized) throw new Error('Informe um nome para o participante.');
+    return normalized;
+  }
+
+  function isParticipantReferenced(workspace, participantId) {
+    const target = String(participantId || '');
+    return workspace.finances.some((item) => item.paidById === target || item.splitBetweenIds.includes(target))
+      || workspace.decisions.some((decision) => decision.options.some((option) => option.voterIds.includes(target)));
+  }
+
+  function removeParticipant(input, participantId) {
+    const workspace = normalizeWorkspace(input);
+    const target = workspace.participants.find((participant) => participant.id === participantId);
+    if (!target) return { workspace, archived: false, found: false };
+    if (isParticipantReferenced(workspace, participantId)) {
+      target.active = false;
+      return { workspace, archived: true, found: true };
+    }
+    workspace.participants = workspace.participants.filter((participant) => participant.id !== participantId);
+    return { workspace, archived: false, found: true };
+  }
+
+  function calculateSettlements(inputFinances, inputParticipants, options) {
+    const participants = (Array.isArray(inputParticipants) ? inputParticipants : []).filter(Boolean);
+    const participantMap = new Map(participants.map((participant) => [participant.id, participant]));
+    const balancesInCents = new Map(participants.map((participant) => [participant.id, 0]));
+    const month = options && /^\d{4}-\d{2}$/.test(String(options.month || '')) ? options.month : null;
+
+    (Array.isArray(inputFinances) ? inputFinances : []).forEach((finance) => {
+      if (!finance || finance.type !== 'expense' || !participantMap.has(finance.paidById)) return;
+      if (month && !String(finance.date || '').startsWith(month)) return;
+      const cents = Math.round(amount(finance.amount) * 100);
+      if (cents <= 0) return;
+      let sharedIds = unique(finance.splitBetweenIds).filter((participantId) => participantMap.has(participantId));
+      if (!sharedIds.length) sharedIds = participants.filter((participant) => participant.active !== false).map((participant) => participant.id);
+      if (!sharedIds.length) return;
+
+      balancesInCents.set(finance.paidById, (balancesInCents.get(finance.paidById) || 0) + cents);
+      const baseShare = Math.floor(cents / sharedIds.length);
+      let remainder = cents - baseShare * sharedIds.length;
+      sharedIds.forEach((participantId) => {
+        const share = baseShare + (remainder > 0 ? 1 : 0);
+        remainder -= remainder > 0 ? 1 : 0;
+        balancesInCents.set(participantId, (balancesInCents.get(participantId) || 0) - share);
+      });
+    });
+
+    const creditors = [];
+    const debtors = [];
+    balancesInCents.forEach((balance, participantId) => {
+      if (balance > 0) creditors.push({ participantId, cents: balance });
+      if (balance < 0) debtors.push({ participantId, cents: -balance });
+    });
+    creditors.sort((a, b) => b.cents - a.cents);
+    debtors.sort((a, b) => b.cents - a.cents);
+
+    const transfers = [];
+    let creditorIndex = 0;
+    let debtorIndex = 0;
+    while (creditorIndex < creditors.length && debtorIndex < debtors.length) {
+      const creditor = creditors[creditorIndex];
+      const debtor = debtors[debtorIndex];
+      const cents = Math.min(creditor.cents, debtor.cents);
+      if (cents > 0) {
+        transfers.push({
+          fromId: debtor.participantId,
+          toId: creditor.participantId,
+          amount: cents / 100,
+        });
+      }
+      creditor.cents -= cents;
+      debtor.cents -= cents;
+      if (creditor.cents === 0) creditorIndex += 1;
+      if (debtor.cents === 0) debtorIndex += 1;
+    }
+
+    return {
+      balances: participants.map((participant) => ({
+        participantId: participant.id,
+        amount: (balancesInCents.get(participant.id) || 0) / 100,
+      })),
+      transfers,
+    };
+  }
+
+  function materializeRecurring(input, throughMonth) {
+    const workspace = normalizeWorkspace(input);
+    const current = new Date();
+    const fallbackMonth = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+    const targetMonth = /^\d{4}-\d{2}$/.test(String(throughMonth || '')) ? String(throughMonth) : fallbackMonth;
+    let added = 0;
+
+    workspace.finances
+      .filter((finance) => finance.recurring && !finance.recurringSourceId && finance.date.slice(0, 7) < targetMonth)
+      .forEach((source) => {
+        const seriesId = source.recurrenceSeriesId || source.id;
+        source.recurrenceSeriesId = seriesId;
+        source.recurrenceSkippedMonths = unique(source.recurrenceSkippedMonths);
+        const [startYear, startMonth] = source.date.slice(0, 7).split('-').map(Number);
+        const [endYear, endMonth] = targetMonth.split('-').map(Number);
+        const difference = (endYear - startYear) * 12 + (endMonth - startMonth);
+        const firstOffset = Math.max(1, difference - 239);
+
+        for (let offset = firstOffset; offset <= difference; offset += 1) {
+          const occurrenceDate = new Date(startYear, startMonth - 1 + offset, 1);
+          const month = `${occurrenceDate.getFullYear()}-${String(occurrenceDate.getMonth() + 1).padStart(2, '0')}`;
+          if (source.recurrenceSkippedMonths.includes(month)) continue;
+          const exists = workspace.finances.some((finance) => (
+            finance.id !== source.id
+            && (finance.recurrenceSeriesId === seriesId || finance.recurringSourceId === source.id)
+            && (finance.occurrenceMonth === month || (!finance.occurrenceMonth && finance.date.slice(0, 7) === month))
+          ));
+          if (exists) continue;
+          const desiredDay = Number(source.date.slice(8, 10)) || 1;
+          const lastDay = new Date(occurrenceDate.getFullYear(), occurrenceDate.getMonth() + 1, 0).getDate();
+          workspace.finances.push({
+            ...clone(source),
+            id: id('finance'),
+            date: `${month}-${String(Math.min(desiredDay, lastDay)).padStart(2, '0')}`,
+            recurring: false,
+            recurringSourceId: source.id,
+            recurrenceSeriesId: seriesId,
+            occurrenceMonth: month,
+            recurrenceSkippedMonths: [],
+            createdAt: nowIso(),
+          });
+          added += 1;
+        }
+      });
+
+    return { workspace, added };
+  }
+
+  function removeFinance(input, financeId) {
+    const workspace = normalizeWorkspace(input);
+    const target = workspace.finances.find((finance) => finance.id === financeId);
+    if (!target) return { workspace, found: false, skippedOccurrence: false };
+    let skippedOccurrence = false;
+    if (target.recurringSourceId && target.occurrenceMonth) {
+      const source = workspace.finances.find((finance) => finance.id === target.recurringSourceId);
+      if (source) {
+        source.recurrenceSkippedMonths = unique([...(source.recurrenceSkippedMonths || []), target.occurrenceMonth]);
+        skippedOccurrence = true;
+      }
+    }
+    if (target.recurring && !target.recurringSourceId) {
+      workspace.finances.forEach((finance) => {
+        if (finance.recurringSourceId !== target.id) return;
+        finance.recurringSourceId = null;
+        finance.recurrenceSeriesId = null;
+        finance.occurrenceMonth = null;
+        finance.recurrenceSkippedMonths = [];
+      });
+    }
+    workspace.finances = workspace.finances.filter((finance) => finance.id !== financeId);
+    return { workspace, found: true, skippedOccurrence };
+  }
+
+  function vote(input, decisionId, optionId, participantId) {
+    const workspace = normalizeWorkspace(input);
+    const participant = workspace.participants.find((item) => item.id === participantId && item.active);
+    const decision = workspace.decisions.find((item) => item.id === decisionId && item.status === 'open');
+    const option = decision && decision.options.find((item) => item.id === optionId);
+    if (!participant || !decision || !option) return { workspace, changed: false };
+    const alreadySelected = option.voterIds.includes(participantId);
+    decision.options.forEach((item) => {
+      item.voterIds = item.voterIds.filter((voterId) => voterId !== participantId);
+    });
+    if (!alreadySelected) option.voterIds.push(participantId);
+    return { workspace, changed: true };
+  }
+
+  const api = Object.freeze({
+    SCHEMA_VERSION,
+    FORMAT,
+    MAX_AMOUNT,
+    PALETTE,
+    CATEGORIES,
+    id,
+    clone,
+    amount,
+    date,
+    createEmptyWorkspace,
+    normalizeWorkspace,
+    createParticipant,
+    isParticipantReferenced,
+    removeParticipant,
+    calculateSettlements,
+    materializeRecurring,
+    removeFinance,
+    vote,
   });
-  return user.uid;
-}
 
-/**
- * Resolve o identificador do Espaço_Casal do Usuário autenticado (Decisão D1).
- * Sempre lê primeiro `casais/{user.uid}`:
- *   - não existe    -> cria um novo Espaço_Casal e retorna `user.uid`;
- *   - tem casalIdRef -> retorna o ponteiro `casalIdRef`;
- *   - caso contrário -> retorna `user.uid` (é o espaço próprio).
- * Requirements: 2.1, 2.2, 2.3, 2.4, 3.2, 6.2
- * @param {{getDoc:Function,setDoc:Function,updateDoc:Function}} store store injetável
- * @param {{uid:string,email:string,displayName?:string|null}} user usuário autenticado
- * @returns {string} o `casalId` resolvido
- */
-function resolverCasalId(store, user) {
-  const doc = store.getDoc('casais', user.uid);
-  if (!doc) {
-    return criarEspacoCasal(store, user);
-  }
-  if (doc.casalIdRef) {
-    return doc.casalIdRef;
-  }
-  return user.uid;
-}
-
-/**
- * Grava uma lista em um campo (`viagens`, `financas`, `metas` ou `checklist`)
- * do documento `casais/{casalId}`, mesclando sobre os demais campos.
- * Requirements: 2.5
- * @param {{getDoc:Function,setDoc:Function,updateDoc:Function}} store store injetável
- * @param {string} casalId identificador do Espaço_Casal
- * @param {string} campo nome do campo de lista
- * @param {Array} lista itens a gravar
- * @returns {void}
- */
-function salvarCampo(store, casalId, campo, lista) {
-  store.updateDoc('casais', casalId, { [campo]: lista });
-}
-
-/**
- * Lê a lista de um campo do documento `casais/{casalId}`.
- * Retorna `[]` quando o documento ou o campo estão ausentes.
- * Requirements: 2.5
- * @param {{getDoc:Function,setDoc:Function,updateDoc:Function}} store store injetável
- * @param {string} casalId identificador do Espaço_Casal
- * @param {string} campo nome do campo de lista
- * @returns {Array} a lista armazenada, ou `[]` se ausente
- */
-function lerCampo(store, casalId, campo) {
-  const doc = store.getDoc('casais', casalId);
-  if (!doc || doc[campo] == null) {
-    return [];
-  }
-  return doc[campo];
-}
-
-// ---------------------------------------------------------------------------
-// Convites (coleção `convites`, documento `convites/{codigo}` — Decisão D3).
-// ---------------------------------------------------------------------------
-
-/**
- * Cria um Convite para o Espaço_Casal `casalId`, gravando `convites/{codigo}`
- * com validade de 72 horas a partir de `agora` (Decisão D3).
- * Requirements: 4.1, 4.2
- * @param {{getDoc:Function,setDoc:Function,updateDoc:Function}} store store injetável
- * @param {string} casalId identificador do Espaço_Casal alvo
- * @param {string} criadoPor e-mail do Membro que gerou o convite
- * @param {number|Date} agora instante base (ms desde a época, ou Date)
- * @returns {string} o Código_Convite gerado
- */
-function criarConvite(store, casalId, criadoPor, agora) {
-  const baseMs = agora instanceof Date ? agora.getTime() : Number(agora);
-  const codigo = gerarCodigo();
-  store.setDoc('convites', codigo, {
-    casalId,
-    criadoPor,
-    criadoEm: new Date(baseMs).toISOString(),
-    expiraEm: new Date(baseMs + 72 * 60 * 60 * 1000).toISOString(),
-  });
-  return codigo;
-}
-
-/**
- * Valida e processa o aceite de um Convite, ingressando o Usuário no
- * Espaço_Casal. Validações avaliadas em ordem (curto-circuito, sem escrever no
- * store em cada erro): existência -> expiração -> lotação -> duplicidade ->
- * sucesso (design: "Ordem de validação em Convites.aceitar").
- * Requirements: 4.4, 4.5, 4.6, 4.7, 4.8, 4.9
- * @param {{getDoc:Function,setDoc:Function,updateDoc:Function}} store store injetável
- * @param {string} codigo Código_Convite informado
- * @param {{uid:string,email:string,displayName?:string|null}} user usuário autenticado
- * @param {number|Date} agora instante atual (ms desde a época, ou Date)
- * @returns {{ok:boolean, erro?:string, casalId?:string}} resultado do aceite
- */
-function aceitarConvite(store, codigo, user, agora) {
-  const agoraMs = agora instanceof Date ? agora.getTime() : Number(agora);
-
-  // 1. Existência do convite.
-  const convite = store.getDoc('convites', codigo);
-  if (!convite) {
-    return { ok: false, erro: 'invalido' };
-  }
-
-  // 2. Expiração.
-  if (new Date(convite.expiraEm).getTime() < agoraMs) {
-    return { ok: false, erro: 'expirou' };
-  }
-
-  // 3. Lotação do Espaço_Casal (máx. 2 Membros).
-  const espaco = store.getDoc('casais', convite.casalId);
-  const membros = (espaco && espaco.membros) || {};
-  if (Object.keys(membros).length >= 2) {
-    return { ok: false, erro: 'cheio' };
-  }
-
-  // 4. Já é Membro.
-  if (membros[user.email]) {
-    return { ok: false, erro: 'ja_membro' };
-  }
-
-  // 5. Sucesso: adiciona o Membro e grava o ponteiro de associação.
-  const nome = user.displayName || nomePadrao(user.email);
-  const membrosAtualizado = Object.assign({}, membros, { [user.email]: nome });
-  store.updateDoc('casais', convite.casalId, { membros: membrosAtualizado });
-  store.setDoc('casais', user.uid, { casalIdRef: convite.casalId });
-  return { ok: true, casalId: convite.casalId };
-}
-
-// Export para Node/testes E para navegador.
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    chaveCache,
-    nomePadrao,
-    gerarCodigo,
-    criarEspacoCasal,
-    resolverCasalId,
-    salvarCampo,
-    lerCampo,
-    criarConvite,
-    aceitarConvite,
-  };
-}
-if (typeof window !== 'undefined') {
-  window.PlannerCore = {
-    chaveCache,
-    nomePadrao,
-    gerarCodigo,
-    criarEspacoCasal,
-    resolverCasalId,
-    salvarCampo,
-    lerCampo,
-    criarConvite,
-    aceitarConvite,
-  };
-}
+  return api;
+});

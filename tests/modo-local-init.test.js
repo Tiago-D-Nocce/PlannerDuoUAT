@@ -1,389 +1,219 @@
-// tests/modo-local-init.test.js — integração do MODO LOCAL sem Firebase.
-//
-// O harness carrega os scripts reais em contextos vm sem `firebase`, usa
-// localStorage compartilhável entre instâncias e sessionStorage por aba.
-
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import vm from 'node:vm';
 
-const RAIZ_PUBLIC = resolve(import.meta.dirname, '..', 'public');
-const AUTH_SOURCE = readFileSync(join(RAIZ_PUBLIC, 'auth.html'), 'utf8');
-const LOCAL_SOURCE = readFileSync(join(RAIZ_PUBLIC, 'local.js'), 'utf8');
+const PUBLIC = resolve(import.meta.dirname, '..', 'public');
+const CORE_SOURCE = readFileSync(resolve(PUBLIC, 'core.js'), 'utf8');
+const LOCAL_SOURCE = readFileSync(resolve(PUBLIC, 'local.js'), 'utf8');
 
-/** Elemento DOM inerte — app.js só precisa não explodir ao tocá-lo. */
-function elementoFalso() {
-  return {
-    value: '',
-    textContent: '',
-    innerHTML: '',
-    className: '',
-    hidden: false,
-    style: {},
-    dataset: {},
-    classList: { add() {}, remove() {}, contains: () => false },
-    appendChild() {},
-    remove() {},
-    setAttribute() {},
-    getAttribute: () => null,
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    addEventListener() {},
-    focus() {},
-    reset() {},
-  };
+class MemoryLocks {
+  constructor() { this.queues = new Map(); }
+  request(name, _options, operation) {
+    const previous = this.queues.get(name) || Promise.resolve();
+    const run = previous.then(operation, operation);
+    this.queues.set(name, run.catch(() => undefined));
+    return run;
+  }
 }
 
-/**
- * Carrega public/app.js em modo local, SEM `firebase` no contexto.
- * `armazenamentoCompartilhado` permite simular duas abas sobre a mesma origem.
- */
-function carregarModoLocal({ armazenamentoCompartilhado = new Map() } = {}) {
-  const canvasIds = [
-    'chart-fluxo',
-    'chart-categorias',
-    'chart-responsavel',
-    'chart-cat-fin',
-    'chart-rel-evolucao',
-    'chart-rel-categorias',
-  ];
-  const elementos = new Map();
-  const adicionar = (id) => {
-    const elemento = elementoFalso();
-    elemento.id = id;
-    elementos.set(id, elemento);
-    return elemento;
-  };
-
-  for (const id of [
-    'sidebar-user-name',
-    'sidebar-avatar',
-    'loader-tela',
-    'tela-app',
-    'stat-saldo',
-    'welcome-msg',
-    'rel-periodo',
-    'rel-pessoa',
-    'rel-tbody',
-    'fin-data',
-    'fin-mes',
-  ]) adicionar(id);
-  for (const id of canvasIds) {
-    const canvas = adicionar(id);
-    canvas.getContext = () => ({ canvasId: id });
+class MemoryStorage {
+  constructor(seed = {}) {
+    this.values = new Map(Object.entries(seed));
+    this.locks = new MemoryLocks();
   }
+  get length() { return this.values.size; }
+  key(index) { return [...this.values.keys()][index] ?? null; }
+  getItem(key) { return this.values.has(key) ? this.values.get(key) : null; }
+  setItem(key, value) { this.values.set(key, String(value)); }
+  removeItem(key) { this.values.delete(key); }
+}
 
-  elementos.get('loader-tela').style.display = 'flex';
-  elementos.get('tela-app').style.opacity = '0';
-  elementos.get('rel-periodo').value = '6';
-  elementos.get('rel-pessoa').value = 'todos';
-
-  const ouvintesDocumento = new Map();
-  const ouvintesJanela = new Map();
-  const documento = {
-    addEventListener(tipo, fn) {
-      const lista = ouvintesDocumento.get(tipo) || [];
-      lista.push(fn);
-      ouvintesDocumento.set(tipo, lista);
-    },
-    getElementById: (id) => elementos.get(id) || null,
-    querySelector: (seletor) => (seletor === '.view.ativa' ? { id: 'relatorios' } : null),
-    querySelectorAll: () => [],
-    createElement: () => elementoFalso(),
-    documentElement: { getAttribute: () => 'light', setAttribute() {} },
-  };
-
-  // Conta/sessão inicial para os testes de montagem. O documento é legado de
-  // propósito: sem _revision, deve ser tratado como revisão zero.
-  const usuarioLocal = { uid: 'local-teste', email: 'pessoa@local.invalid', displayName: 'Pessoa Local' };
-  if (!armazenamentoCompartilhado.has('plannerduo-local:v1:users')) {
-    armazenamentoCompartilhado.set('plannerduo-local:v1:users', JSON.stringify({
-      [usuarioLocal.email]: { ...usuarioLocal, password: { salt: '', hash: '' } },
-    }));
-  }
-  if (!armazenamentoCompartilhado.has('pd-cache:local-teste')) {
-    armazenamentoCompartilhado.set('pd-cache:local-teste', JSON.stringify({
-      membros: { [usuarioLocal.email]: usuarioLocal.displayName },
-      nome1: usuarioLocal.displayName,
-      nome2: null,
-      financas: [], viagens: [], metas: [], checklist: [], orcamentos: {},
-    }));
-  }
-
-  const operacoesStorage = { set: 0, remove: 0 };
-  const localStorage = {
-    getItem: (k) => (armazenamentoCompartilhado.has(k) ? armazenamentoCompartilhado.get(k) : null),
-    setItem: (k, v) => {
-      operacoesStorage.set += 1;
-      armazenamentoCompartilhado.set(k, String(v));
-    },
-    removeItem: (k) => {
-      operacoesStorage.remove += 1;
-      armazenamentoCompartilhado.delete(k);
-    },
-  };
-  const sessao = new Map([[
-    'plannerduo-local:v1:session',
-    JSON.stringify({ uid: usuarioLocal.uid, email: usuarioLocal.email }),
-  ]]);
-  const sessionStorage = {
-    getItem: (k) => (sessao.has(k) ? sessao.get(k) : null),
-    setItem: (k, v) => { sessao.set(k, String(v)); },
-    removeItem: (k) => { sessao.delete(k); },
-  };
-
-  const supervisor = {
-    estado: 'pendente',
-    chamadas: { iniciarFase: 0, concluir: 0, falhar: 0 },
-    iniciarFase() { this.chamadas.iniciarFase += 1; },
-    estadoAtual() { return { estado: this.estado }; },
-    concluir() {
-      this.chamadas.concluir += 1;
-      this.estado = 'pronto';
-      return true;
-    },
-    falhar() {
-      this.chamadas.falhar += 1;
-      this.estado = 'erro';
-      return true;
-    },
-  };
-
-  const contexto = {
+function harness(localSeed = {}, sessionSeed = {}) {
+  const listeners = new Map();
+  const sharedLocalStorage = localSeed instanceof MemoryStorage ? localSeed : new MemoryStorage(localSeed);
+  const context = {
     console,
     crypto,
-    Intl,
     Date,
     Math,
     JSON,
-    TextEncoder,
-    btoa,
-    atob,
-    setTimeout,
-    clearTimeout,
-    URL,
-    Blob: class {},
-    localStorage,
-    sessionStorage,
-    document: documento,
-    location: { pathname: '/app', hostname: 'localhost', href: '', replace() {} },
-    navigator: { clipboard: { writeText: async () => {} } },
-    PLANNERDUO_MODO: 'local',
-    PlannerBootstrap: supervisor,
-    addEventListener(tipo, fn) {
-      const lista = ouvintesJanela.get(tipo) || [];
-      lista.push(fn);
-      ouvintesJanela.set(tipo, lista);
+    Intl,
+    localStorage: sharedLocalStorage,
+    sessionStorage: new MemoryStorage(sessionSeed),
+    navigator: { locks: sharedLocalStorage.locks },
+    addEventListener(type, listener) {
+      const current = listeners.get(type) || [];
+      current.push(listener);
+      listeners.set(type, current);
     },
-    removeEventListener(tipo, fn) {
-      const lista = ouvintesJanela.get(tipo) || [];
-      ouvintesJanela.set(tipo, lista.filter(item => item !== fn));
+    removeEventListener(type, listener) {
+      listeners.set(type, (listeners.get(type) || []).filter((item) => item !== listener));
     },
   };
-  contexto.window = contexto;
-  contexto.globalThis = contexto;
-
-  vm.createContext(contexto);
-  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'auth-errors.js'), 'utf8'), contexto, { filename: 'auth-errors.js' });
-  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'core.js'), 'utf8'), contexto, { filename: 'core.js' });
-  vm.runInContext(LOCAL_SOURCE, contexto, { filename: 'local.js' });
-  vm.runInContext(readFileSync(join(RAIZ_PUBLIC, 'app.js'), 'utf8'), contexto, { filename: 'app.js' });
-  vm.runInContext('globalThis.__app = { Auth, Estado, DB, Convites, UI, ehModoLocal };', contexto);
-
+  context.window = context;
+  context.globalThis = context;
+  vm.createContext(context);
+  vm.runInContext(CORE_SOURCE, context, { filename: 'core.js' });
+  vm.runInContext(LOCAL_SOURCE, context, { filename: 'local.js' });
   return {
-    ...contexto.__app,
-    contexto,
-    elementos,
-    armazenamento: armazenamentoCompartilhado,
-    operacoesStorage,
-    supervisor,
-    dispararDOMContentLoaded() {
-      for (const fn of ouvintesDocumento.get('DOMContentLoaded') || []) fn();
+    core: context.PlannerCore,
+    repository: context.PlannerLocal,
+    localStorage: context.localStorage,
+    sessionStorage: context.sessionStorage,
+    dispatchStorage(key, newValue) {
+      for (const listener of listeners.get('storage') || []) listener({ key, newValue });
     },
-    dispararStorage(key, newValue) {
-      for (const fn of [...(ouvintesJanela.get('storage') || [])]) {
-        fn({ key, newValue, storageArea: localStorage });
-      }
-    },
-    quantidadeOuvintes(tipo) {
-      return (ouvintesJanela.get(tipo) || []).length;
-    },
-    temFirebaseNoContexto: Object.prototype.hasOwnProperty.call(contexto, 'firebase'),
+    listenerCount(type) { return (listeners.get(type) || []).length; },
   };
 }
 
-function snapshotArmazenamento(mapa) {
-  return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b));
-}
+describe('inicialização do banco local', () => {
+  it('remove o banco legado e cria um workspace realmente vazio', async () => {
+    const app = harness({
+      'pd-cache:antigo': '{"financas":[1]}',
+      'pd-buscas:antigo': '[]',
+      'plannerduo-local:v1:users': '{}',
+      'pd-tema': 'dark',
+      'chave-de-outro-app': 'preservar',
+    }, { 'plannerduo-local:v1:session': '{}' });
 
-describe('modo local: inicialização abre o painel sem Firebase e conclui o bootstrap', () => {
-  it('carrega o módulo em modo local mesmo sem `firebase` definido no contexto', () => {
-    const h = carregarModoLocal();
-    expect(h.temFirebaseNoContexto).toBe(false);
-    expect(typeof h.ehModoLocal).toBe('function');
-    expect(h.ehModoLocal()).toBe(true);
+    const workspace = await app.repository.initialize();
+    expect(workspace.name).toBe('');
+    expect(workspace.participants.length).toBe(0);
+    expect(workspace.finances.length).toBe(0);
+    expect(app.localStorage.getItem('pd-cache:antigo')).toBeNull();
+    expect(app.localStorage.getItem('pd-buscas:antigo')).toBeNull();
+    expect(app.localStorage.getItem('plannerduo-local:v1:users')).toBeNull();
+    expect(app.localStorage.getItem('pd-tema')).toBeNull();
+    expect(app.sessionStorage.getItem('plannerduo-local:v1:session')).toBeNull();
+    expect(app.localStorage.getItem('chave-de-outro-app')).toBe('preservar');
+    expect(app.localStorage.getItem(app.repository.CLEAN_START_KEY)).toBe('done');
+    expect(app.localStorage.getItem(app.repository.STORAGE_KEY)).not.toBeNull();
   });
 
-  it('monta o painel sem lançar, esconde o loader e conclui — sem chamar falhar()', () => {
-    const h = carregarModoLocal();
-    expect(h.supervisor.estadoAtual().estado).toBe('pendente');
-
-    expect(() => h.dispararDOMContentLoaded()).not.toThrow();
-
-    expect(h.elementos.get('tela-app').style.opacity).toBe('1');
-    expect(h.supervisor.estadoAtual().estado).toBe('pronto');
-    expect(h.supervisor.chamadas.concluir).toBe(1);
-    expect(h.supervisor.chamadas.falhar).toBe(0);
-    expect(h.Estado.casalId).toBe('local-teste');
-    expect(h.Estado._localRevision).toBe(0);
-    expect(h.elementos.get('sidebar-user-name').textContent).toBe('Pessoa Local');
+  it('executa a limpeza destrutiva somente uma vez', async () => {
+    const app = harness();
+    const initial = await app.repository.initialize();
+    const saved = await app.repository.update((draft) => { draft.name = 'Persistente'; }, initial.generation);
+    expect(saved.revision).toBe(1);
+    expect(app.repository.load().name).toBe('Persistente');
   });
 
-  it('chamar Auth._entrarModoLocal() diretamente também conclui o bootstrap sem falhar()', () => {
-    const h = carregarModoLocal();
-
-    expect(() => h.Auth._entrarModoLocal()).not.toThrow();
-
-    expect(h.elementos.get('tela-app').style.opacity).toBe('1');
-    expect(h.supervisor.chamadas.concluir).toBe(1);
-    expect(h.supervisor.chamadas.falhar).toBe(0);
-    expect(h.Estado.usuarioUid).toBe('local-teste');
-    expect(h.quantidadeOuvintes('storage')).toBe(1);
-  });
-});
-
-describe('modo local: autenticação exige credencial', () => {
-  it('não expõe atalho de demonstração e oculta o botão alternativo no ramo local', () => {
-    const h = carregarModoLocal();
-    const nomeAtalhoDemo = 'signIn' + 'Demo';
-
-    expect(Object.prototype.hasOwnProperty.call(h.contexto.PlannerLocal.auth, nomeAtalhoDemo)).toBe(false);
-    expect(LOCAL_SOURCE).not.toContain(nomeAtalhoDemo);
-    expect(AUTH_SOURCE).not.toContain(nomeAtalhoDemo);
-    expect(AUTH_SOURCE).toContain('alternativo.hidden = true');
-    expect(AUTH_SOURCE).toContain("if (MODO_LOCAL) return;");
-  });
-
-  it('reset exige a senha atual, rejeita prova incorreta e só aceita login com a senha nova', async () => {
-    const h = carregarModoLocal();
-    const authLocal = h.contexto.PlannerLocal.auth;
-    const email = 'reset@local.invalid';
-
-    await authLocal.createUser(email, 'senha-antiga', 'Conta Reset');
-    await authLocal.signOut();
-
-    await expect(authLocal.resetPassword(email, '', 'senha-nova')).rejects.toMatchObject({ code: 'auth/invalid-credential' });
-    await expect(authLocal.resetPassword(email, 'senha-errada', 'senha-nova')).rejects.toMatchObject({ code: 'auth/invalid-credential' });
-    await expect(authLocal.signIn(email, 'senha-antiga')).resolves.toMatchObject({ email });
-    await authLocal.signOut();
-
-    await expect(authLocal.resetPassword(email, 'senha-antiga', 'senha-nova')).resolves.toBeUndefined();
-    await expect(authLocal.signIn(email, 'senha-antiga')).rejects.toMatchObject({ code: 'auth/invalid-credential' });
-    await expect(authLocal.signIn(email, 'senha-nova')).resolves.toMatchObject({ email });
+  it('recupera JSON corrompido e o reset remove o diagnóstico', async () => {
+    const app = harness({
+      'plannerduo:clean-start:v1': 'done',
+      'plannerduo:workspace:v1': '{json inválido',
+    });
+    const workspace = await app.repository.initialize();
+    expect(workspace.participants.length).toBe(0);
+    expect(app.repository.getLastWarning().code).toBe('local/storage-corrupt');
+    expect([...app.localStorage.values.keys()].some((key) => key.startsWith('plannerduo:corrupt:'))).toBe(true);
+    await app.repository.reset();
+    expect([...app.localStorage.values.keys()].some((key) => key.startsWith('plannerduo:corrupt:'))).toBe(false);
   });
 });
 
-describe('modo local: convite não permite reassociação implícita', () => {
-  it('bloqueia segundo espaço sem alterar ponteiro ou membros', async () => {
-    const h = carregarModoLocal();
-    const authLocal = h.contexto.PlannerLocal.auth;
-    const store = h.contexto.PlannerLocal.store;
-    const core = h.contexto.PlannerCore;
-    const agora = Date.now();
+describe('persistência e portabilidade', () => {
+  it('aplica mutações sobre o snapshot mais recente e incrementa revisões', async () => {
+    const app = harness();
+    const initial = await app.repository.initialize();
+    const first = await app.repository.update((draft) => { draft.name = 'Workspace'; }, initial.generation);
+    const second = await app.repository.update((draft) => { draft.name = 'Workspace atualizado'; }, first.generation);
+    expect(first.revision).toBe(1);
+    expect(second.revision).toBe(2);
+    expect(app.repository.load().name).toBe('Workspace atualizado');
+  });
 
-    const ana = await authLocal.createUser('ana@local.invalid', 'senha-ana', 'Ana');
-    const conviteAna = core.criarConvite(store, ana.uid, ana.email, agora);
-    await authLocal.signOut();
+  it('faz round-trip de backup completo e rejeita versão incompatível', async () => {
+    const app = harness();
+    const initial = await app.repository.initialize();
+    const workspace = await app.repository.update((draft) => {
+      draft.name = 'Backup';
+      draft.participants.push(app.core.createParticipant({ name: 'Livre', color: '#6366f1' }, 0));
+    }, initial.generation);
 
-    const bia = await authLocal.createUser('bia@local.invalid', 'senha-bia', 'Bia');
-    h.Auth._entrarModoLocal();
-    await h.Convites.aceitar(conviteAna);
-    expect(store.getDoc('casais', bia.uid)).toEqual({ casalIdRef: ana.uid });
-    await authLocal.signOut();
+    const restored = await app.repository.importJson(app.repository.exportJson(workspace));
+    expect(restored.name).toBe('Backup');
+    expect(restored.participants[0].name).toBe('Livre');
+    expect(() => app.repository.importJson('{"schemaVersion":999}')).toThrow(/versão/i);
+  });
 
-    const carla = await authLocal.createUser('carla@local.invalid', 'senha-carla', 'Carla');
-    const conviteCarla = core.criarConvite(store, carla.uid, carla.email, agora);
-    await authLocal.signOut();
-    await authLocal.signIn(bia.email, 'senha-bia');
-    h.Auth._entrarModoLocal();
+  it('rejeita backup que seria coercivo ou perderia campos', async () => {
+    const app = harness();
+    const workspace = await app.repository.initialize();
+    const invalid = JSON.parse(app.repository.exportJson(workspace));
+    invalid.participants.push({ id: 'p', name: 'Teste', color: '#6366f1', active: 'false', createdAt: new Date().toISOString() });
+    expect(() => app.repository.importJson(JSON.stringify(invalid))).toThrow(/participante|inválidos/i);
+  });
 
-    const antes = snapshotArmazenamento(h.armazenamento);
-    const mensagens = [];
-    h.UI.toast = (titulo) => mensagens.push(titulo);
-    await h.Convites.aceitar(conviteCarla);
+  it('reset retorna ao estado vazio com nova geração', async () => {
+    const app = harness();
+    const initial = await app.repository.initialize();
+    const saved = await app.repository.update((draft) => { draft.name = 'Será apagado'; }, initial.generation);
+    const empty = await app.repository.reset();
+    expect(empty.name).toBe('');
+    expect(empty.participants.length).toBe(0);
+    expect(empty.revision).toBe(saved.revision + 1);
+    expect(empty.generation).not.toBe(saved.generation);
+  });
 
-    expect(mensagens).toContain('Você já participa de um espaço compartilhado.');
-    expect(snapshotArmazenamento(h.armazenamento)).toEqual(antes);
-    expect(store.getDoc('casais', bia.uid)).toEqual({ casalIdRef: ana.uid });
-    expect(store.getDoc('casais', carla.uid).membros).toEqual({ [carla.email]: 'Carla' });
-    expect(store.getDoc('casais', ana.uid).membros[bia.email]).toBe('Bia');
+  it('notifica outra aba e remove o listener ao cancelar inscrição', async () => {
+    const app = harness();
+    const initial = await app.repository.initialize();
+    const received = [];
+    const unsubscribe = app.repository.subscribe((workspace) => received.push(workspace));
+    expect(app.listenerCount('storage')).toBe(1);
+    app.dispatchStorage(app.repository.STORAGE_KEY, JSON.stringify({ ...initial, name: 'Outra aba', revision: 2 }));
+    expect(received).toHaveLength(1);
+    expect(received[0].name).toBe('Outra aba');
+    unsubscribe();
+    expect(app.listenerCount('storage')).toBe(0);
   });
 });
 
-describe('modo local: concorrência e sincronização entre abas', () => {
-  it('preserva outro campo gravado por instância stale e bloqueia conflito no mesmo campo', async () => {
-    const compartilhado = new Map();
-    const abaA = carregarModoLocal({ armazenamentoCompartilhado: compartilhado });
-    const abaB = carregarModoLocal({ armazenamentoCompartilhado: compartilhado });
-    abaA.Auth._entrarModoLocal();
-    abaB.Auth._entrarModoLocal();
+describe('concorrência e exclusão entre abas', () => {
+  it('serializa duas mutações concorrentes sem perder campos', async () => {
+    const shared = new MemoryStorage();
+    const firstTab = harness(shared);
+    const secondTab = harness(shared);
+    const initial = await firstTab.repository.initialize();
+    await secondTab.repository.initialize();
 
-    abaA.Estado.financas = [{ id: 'f-a', tipo: 'despesa', data: '2026-09-01', desc: 'A', valor: 10 }];
-    expect(await abaA.DB.salvar('financas')).toBe(true);
+    await Promise.all([
+      firstTab.repository.update((draft) => { draft.name = 'Alteração da primeira aba'; }, initial.generation),
+      secondTab.repository.update((draft) => {
+        draft.goals.push({
+          id: 'goal-1', title: 'Meta', emoji: '🎯', target: 10, current: 0,
+          deadline: '', description: '', createdAt: new Date().toISOString(),
+        });
+      }, initial.generation),
+    ]);
 
-    abaB.Estado.metas = [{ id: 'm-b', titulo: 'Meta B', alvo: 100, atual: 1, prazo: '2026-12-01' }];
-    expect(await abaB.DB.salvar('metas')).toBe(true);
-
-    let persistido = JSON.parse(compartilhado.get('pd-cache:local-teste'));
-    expect(persistido.financas.map(item => item.id)).toEqual(['f-a']);
-    expect(persistido.metas.map(item => item.id)).toEqual(['m-b']);
-    expect(persistido._revision).toBe(2);
-
-    abaB.Estado.financas = [{ id: 'f-b', tipo: 'despesa', data: '2026-09-02', desc: 'B', valor: 20 }];
-    expect(await abaB.DB.salvar('financas')).toBe(true);
-    persistido = JSON.parse(compartilhado.get('pd-cache:local-teste'));
-    const revisaoAntesConflito = persistido._revision;
-
-    const mensagens = [];
-    abaA.UI.toast = (titulo) => mensagens.push(titulo);
-    abaA.Estado.financas = [{ id: 'f-a2', tipo: 'despesa', data: '2026-09-03', desc: 'A2', valor: 30 }];
-    expect(await abaA.DB.salvar('financas')).toBe(false);
-
-    persistido = JSON.parse(compartilhado.get('pd-cache:local-teste'));
-    expect(persistido._revision).toBe(revisaoAntesConflito);
-    expect(persistido.financas.map(item => item.id)).toEqual(['f-b']);
-    expect(abaA.Estado.financas.map(item => item.id)).toEqual(['f-b']);
-    expect(mensagens).toContain('Dados atualizados em outra aba. Repita sua alteração.');
+    const finalState = firstTab.repository.load();
+    expect(finalState.name).toBe('Alteração da primeira aba');
+    expect(finalState.goals).toHaveLength(1);
+    expect(finalState.revision).toBe(2);
   });
 
-  it('evento storage atualiza estado/render sem escrever e listener é idempotente/removível', () => {
-    const compartilhado = new Map();
-    const h = carregarModoLocal({ armazenamentoCompartilhado: compartilhado });
-    h.Auth._entrarModoLocal();
-    h.DB.ouvirNuvem();
-    expect(h.quantidadeOuvintes('storage')).toBe(1);
+  it('invalida writers antigos depois de reset e impede ressurreição', async () => {
+    const shared = new MemoryStorage();
+    const currentTab = harness(shared);
+    const staleTab = harness(shared);
+    const initial = await currentTab.repository.initialize();
+    const saved = await currentTab.repository.update((draft) => { draft.name = 'Dados existentes'; }, initial.generation);
+    const stale = await staleTab.repository.initialize();
 
-    const chave = 'pd-cache:local-teste';
-    const atual = JSON.parse(compartilhado.get(chave));
-    const externo = {
-      ...atual,
-      metas: [{ id: 'externa', titulo: 'Outra aba', alvo: 50, atual: 5, prazo: '2026-12-31' }],
-      _revision: 1,
-      _updatedAt: new Date().toISOString(),
-      _fieldRevisions: { metas: 1 },
-    };
-    compartilhado.set(chave, JSON.stringify(externo));
-    const escritasAntes = h.operacoesStorage.set;
+    const empty = await currentTab.repository.reset();
+    expect(empty.revision).toBe(saved.revision + 1);
+    await expect(staleTab.repository.update((draft) => { draft.name = 'Ressuscitado'; }, stale.generation))
+      .rejects.toMatchObject({ code: 'local/workspace-replaced' });
+    expect(currentTab.repository.load().name).toBe('');
+  });
 
-    h.dispararStorage(chave, JSON.stringify(externo));
-
-    expect(h.Estado._localRevision).toBe(1);
-    expect(h.Estado.metas.map(item => item.id)).toEqual(['externa']);
-    expect(h.operacoesStorage.set).toBe(escritasAntes);
-
-    h.Auth._finalizarLogoutLocal('auth.html');
-    expect(h.quantidadeOuvintes('storage')).toBe(0);
-    expect(compartilhado.has(chave)).toBe(true);
+  it('rejeita objetos que não sejam backups completos', () => {
+    const app = harness();
+    app.repository.load();
+    expect(() => app.repository.importJson('{"schemaVersion":1}')).toThrow(/versão|formato/i);
   });
 });

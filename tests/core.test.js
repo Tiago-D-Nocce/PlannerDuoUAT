@@ -1,326 +1,252 @@
-// tests/core.test.js — testes de propriedade da lógica pura de public/core.js
-//
-// core.js é o núcleo desacoplado do Firebase: recebe um `store` injetável, o
-// que permite exercitar Espaço_Casal e Convites sem I/O real. Os testes usam
-// fast-check para as invariantes e casos concretos para a ordem de validação.
-
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import core from '../public/core.js';
 
-const {
-  chaveCache,
-  nomePadrao,
-  gerarCodigo,
-  criarEspacoCasal,
-  resolverCasalId,
-  salvarCampo,
-  lerCampo,
-  criarConvite,
-  aceitarConvite,
-} = core;
+function participant(name, index) {
+  return core.createParticipant({ name, color: core.PALETTE[index % core.PALETTE.length] }, index);
+}
 
-const HORA = 60 * 60 * 1000;
-const VALIDADE_CONVITE = 72 * HORA;
-
-// Store em memória que implementa o contrato documentado em core.js:
-// getDoc / setDoc (substitui) / updateDoc (merge raso).
-function criarStore(inicial = {}) {
-  const dados = structuredClone(inicial);
+function expense({ id = 'expense-1', paidById, splitBetweenIds, amount = 100, date = '2026-09-15' }) {
   return {
-    dados,
-    getDoc(colecao, id) {
-      return dados[colecao] && dados[colecao][id] ? dados[colecao][id] : null;
-    },
-    setDoc(colecao, id, doc) {
-      dados[colecao] = dados[colecao] || {};
-      dados[colecao][id] = structuredClone(doc);
-    },
-    updateDoc(colecao, id, patch) {
-      dados[colecao] = dados[colecao] || {};
-      dados[colecao][id] = { ...(dados[colecao][id] || {}), ...structuredClone(patch) };
-    },
+    id,
+    type: 'expense',
+    description: 'Despesa compartilhada',
+    amount,
+    date,
+    category: 'outros',
+    paidById,
+    splitBetweenIds,
+    tripId: null,
+    notes: '',
+    recurring: false,
+    recurringSourceId: null,
+    createdAt: '2026-09-15T12:00:00.000Z',
   };
 }
 
-const arbUsuario = () =>
-  fc.record({
-    uid: fc.string({ minLength: 1, maxLength: 24 }).filter(s => s.trim() !== ''),
-    email: fc.emailAddress(),
-    displayName: fc.option(fc.string({ minLength: 1, maxLength: 30 }), { nil: null }),
+describe('workspace local vazio', () => {
+  it('nasce sem perfis e sem dados de demonstração', () => {
+    const workspace = core.createEmptyWorkspace();
+    expect(workspace.schemaVersion).toBe(core.SCHEMA_VERSION);
+    expect(workspace.name).toBe('');
+    expect(workspace.participants).toEqual([]);
+    expect(workspace.finances).toEqual([]);
+    expect(workspace.trips).toEqual([]);
+    expect(workspace.goals).toEqual([]);
+    expect(workspace.checklist).toEqual([]);
+    expect(workspace.decisions).toEqual([]);
+    expect(workspace.budgets).toEqual({});
   });
 
-const arbCampoLista = () => fc.constantFrom('viagens', 'financas', 'metas', 'checklist');
-
-describe('chaveCache', () => {
-  it('deriva sempre o prefixo pd-cache: do casalId', () => {
-    fc.assert(
-      fc.property(fc.string(), (casalId) => {
-        expect(chaveCache(casalId)).toBe(`pd-cache:${casalId}`);
-      })
-    );
-  });
-
-  it('casalIds distintos produzem chaves distintas (isolamento de cache)', () => {
-    fc.assert(
-      fc.property(fc.string(), fc.string(), (a, b) => {
-        fc.pre(a !== b);
-        expect(chaveCache(a)).not.toBe(chaveCache(b));
-      })
-    );
-  });
-});
-
-describe('nomePadrao', () => {
-  it('devolve a parte local do e-mail', () => {
-    fc.assert(
-      fc.property(fc.emailAddress(), (email) => {
-        const nome = nomePadrao(email);
-        expect(email.startsWith(`${nome}@`)).toBe(true);
-        expect(nome).not.toContain('@');
-      })
-    );
-  });
-
-  it('devolve a string inteira quando não há @', () => {
-    fc.assert(
-      fc.property(fc.string().filter(s => !s.includes('@')), (s) => {
-        expect(nomePadrao(s)).toBe(s);
-      })
-    );
-  });
-});
-
-describe('gerarCodigo', () => {
-  it('gera 8 caracteres do alfabeto A-Z0-9', () => {
-    for (let i = 0; i < 500; i++) {
-      const codigo = gerarCodigo();
-      expect(codigo).toHaveLength(8);
-      expect(codigo).toMatch(/^[A-Z0-9]{8}$/);
-    }
-  });
-});
-
-describe('criarEspacoCasal', () => {
-  it('cria o espaço em casais/{uid} com o criador como único membro', () => {
-    fc.assert(
-      fc.property(arbUsuario(), (user) => {
-        const store = criarStore();
-        const casalId = criarEspacoCasal(store, user);
-
-        expect(casalId).toBe(user.uid);
-        const doc = store.getDoc('casais', user.uid);
-        const nomeEsperado = user.displayName || nomePadrao(user.email);
-
-        expect(doc.membros).toEqual({ [user.email]: nomeEsperado });
-        expect(doc.nome1).toBe(nomeEsperado);
-        expect(doc.nome2).toBeNull();
-        expect(doc.viagens).toEqual([]);
-        expect(doc.financas).toEqual([]);
-        expect(doc.metas).toEqual([]);
-        expect(doc.checklist).toEqual([]);
-      })
-    );
-  });
-
-  it('usa a parte local do e-mail quando não há displayName', () => {
-    const store = criarStore();
-    criarEspacoCasal(store, { uid: 'u1', email: 'ana@exemplo.com', displayName: null });
-    expect(store.getDoc('casais', 'u1').nome1).toBe('ana');
-  });
-});
-
-describe('resolverCasalId', () => {
-  it('cria o espaço quando o documento não existe', () => {
-    fc.assert(
-      fc.property(arbUsuario(), (user) => {
-        const store = criarStore();
-        expect(resolverCasalId(store, user)).toBe(user.uid);
-        expect(store.getDoc('casais', user.uid)).not.toBeNull();
-      })
-    );
-  });
-
-  it('é idempotente: resolver duas vezes devolve o mesmo casalId', () => {
-    fc.assert(
-      fc.property(arbUsuario(), (user) => {
-        const store = criarStore();
-        const primeiro = resolverCasalId(store, user);
-        const segundo = resolverCasalId(store, user);
-        expect(segundo).toBe(primeiro);
-      })
-    );
-  });
-
-  it('segue o ponteiro casalIdRef quando presente', () => {
-    fc.assert(
-      fc.property(arbUsuario(), fc.string({ minLength: 1 }), (user, alvo) => {
-        const store = criarStore({ casais: { [user.uid]: { casalIdRef: alvo } } });
-        expect(resolverCasalId(store, user)).toBe(alvo);
-      })
-    );
-  });
-
-  it('devolve o uid quando o documento é o espaço próprio', () => {
-    const user = { uid: 'u1', email: 'ana@exemplo.com', displayName: 'Ana' };
-    const store = criarStore({ casais: { u1: { membros: { 'ana@exemplo.com': 'Ana' } } } });
-    expect(resolverCasalId(store, user)).toBe('u1');
-  });
-});
-
-describe('salvarCampo / lerCampo', () => {
-  it('faz round-trip da lista gravada', () => {
-    fc.assert(
-      fc.property(fc.string({ minLength: 1 }), arbCampoLista(), fc.array(fc.jsonValue()), (casalId, campo, lista) => {
-        const store = criarStore({ casais: { [casalId]: { membros: {} } } });
-        salvarCampo(store, casalId, campo, lista);
-        expect(lerCampo(store, casalId, campo)).toEqual(lista);
-      })
-    );
-  });
-
-  it('devolve [] para documento ou campo ausente', () => {
-    fc.assert(
-      fc.property(fc.string({ minLength: 1 }), arbCampoLista(), (casalId, campo) => {
-        expect(lerCampo(criarStore(), casalId, campo)).toEqual([]);
-      })
-    );
-  });
-
-  it('gravar um campo não afeta os demais', () => {
-    const store = criarStore({ casais: { c1: { financas: [{ id: 'f1' }], metas: [{ id: 'm1' }] } } });
-    salvarCampo(store, 'c1', 'financas', []);
-    expect(lerCampo(store, 'c1', 'financas')).toEqual([]);
-    expect(lerCampo(store, 'c1', 'metas')).toEqual([{ id: 'm1' }]);
-  });
-});
-
-describe('criarConvite', () => {
-  it('grava validade de exatamente 72h a partir do instante base', () => {
-    fc.assert(
-      fc.property(
-        fc.string({ minLength: 1 }),
-        fc.emailAddress(),
-        fc.integer({ min: 0, max: 4_000_000_000_000 }),
-        (casalId, criadoPor, agora) => {
-          const store = criarStore();
-          const codigo = criarConvite(store, casalId, criadoPor, agora);
-          const convite = store.getDoc('convites', codigo);
-
-          expect(convite.casalId).toBe(casalId);
-          expect(convite.criadoPor).toBe(criadoPor);
-          const criadoEm = new Date(convite.criadoEm).getTime();
-          const expiraEm = new Date(convite.expiraEm).getTime();
-          expect(expiraEm - criadoEm).toBe(VALIDADE_CONVITE);
-        }
-      )
-    );
-  });
-
-  it('aceita Date além de timestamp numérico', () => {
-    const store = criarStore();
-    const agora = new Date('2026-01-01T00:00:00.000Z');
-    const codigo = criarConvite(store, 'c1', 'ana@exemplo.com', agora);
-    expect(store.getDoc('convites', codigo).expiraEm).toBe('2026-01-04T00:00:00.000Z');
-  });
-});
-
-describe('aceitarConvite', () => {
-  const agora = Date.parse('2026-01-01T12:00:00.000Z');
-  const dono = { uid: 'dono', email: 'ana@exemplo.com', displayName: 'Ana' };
-  const convidado = { uid: 'convidado', email: 'bruno@exemplo.com', displayName: 'Bruno' };
-
-  // Espaço com 1 membro + convite válido.
-  function cenario(overrides = {}) {
-    const store = criarStore();
-    criarEspacoCasal(store, dono);
-    const codigo = criarConvite(store, dono.uid, dono.email, agora);
-    if (overrides.convite) {
-      store.setDoc('convites', codigo, { ...store.getDoc('convites', codigo), ...overrides.convite });
-    }
-    if (overrides.membros) {
-      store.updateDoc('casais', dono.uid, { membros: overrides.membros });
-    }
-    return { store, codigo };
-  }
-
-  it('rejeita código inexistente', () => {
-    const { store } = cenario();
-    expect(aceitarConvite(store, 'NAOEXISTE', convidado, agora)).toEqual({ ok: false, erro: 'invalido' });
-  });
-
-  it('rejeita convite expirado', () => {
-    const { store, codigo } = cenario();
-    const depois = agora + VALIDADE_CONVITE + 1;
-    expect(aceitarConvite(store, codigo, convidado, depois)).toEqual({ ok: false, erro: 'expirou' });
-  });
-
-  it('aceita no limite exato da validade', () => {
-    const { store, codigo } = cenario();
-    expect(aceitarConvite(store, codigo, convidado, agora + VALIDADE_CONVITE).ok).toBe(true);
-  });
-
-  it('rejeita espaço já com 2 membros', () => {
-    const { store, codigo } = cenario({
-      membros: { [dono.email]: 'Ana', 'carla@exemplo.com': 'Carla' },
+  it('normaliza entradas malformadas sem propagar valores inválidos', () => {
+    const normalized = core.normalizeWorkspace({
+      name: '  Espaço livre  ',
+      participants: [null, { name: '  Alex  ', color: 'inválida' }],
+      finances: [
+        { description: '', amount: 'abc', date: 'x' },
+        { type: 'income', description: 'Entrada', amount: '1.234,56', date: '2026-09-01', category: 'salario' },
+      ],
+      budgets: { lazer: '500,50', desconhecida: 10, saude: -1 },
     });
-    expect(aceitarConvite(store, codigo, convidado, agora)).toEqual({ ok: false, erro: 'cheio' });
+    expect(normalized.name).toBe('Espaço livre');
+    expect(normalized.participants).toHaveLength(1);
+    expect(normalized.participants[0].name).toBe('Alex');
+    expect(normalized.participants[0].color).toMatch(/^#[0-9a-f]{6}$/);
+    expect(normalized.finances).toHaveLength(1);
+    expect(normalized.finances[0].amount).toBe(1234.56);
+    expect(normalized.budgets).toEqual({ lazer: 500.5 });
   });
 
-  it('rejeita quem já é membro', () => {
-    const { store, codigo } = cenario({ membros: { [convidado.email]: 'Bruno' } });
-    expect(aceitarConvite(store, codigo, convidado, agora)).toEqual({ ok: false, erro: 'ja_membro' });
+  it('preserva participantes com nomes iguais por seus IDs estáveis', () => {
+    const first = participant('Alex', 0);
+    const second = participant('Alex', 1);
+    const normalized = core.normalizeWorkspace({ participants: [first, second] });
+    expect(normalized.participants.map((item) => item.name)).toEqual(['Alex', 'Alex']);
+    expect(new Set(normalized.participants.map((item) => item.id)).size).toBe(2);
+  });
+});
+
+describe('valores monetários', () => {
+  it('aceita formatos decimal e brasileiro', () => {
+    expect(core.amount('100.50')).toBe(100.5);
+    expect(core.amount('1.234,56')).toBe(1234.56);
+    expect(core.amount('0,01')).toBe(0.01);
+    expect(core.amount(Number.MAX_VALUE)).toBe(0);
   });
 
-  it('avalia expiração antes de lotação (ordem de curto-circuito)', () => {
-    const { store, codigo } = cenario({
-      membros: { [dono.email]: 'Ana', 'carla@exemplo.com': 'Carla' },
+  it('nunca devolve NaN ou valor negativo', () => {
+    fc.assert(fc.property(fc.anything(), (value) => {
+      expect(Number.isFinite(core.amount(value))).toBe(true);
+      expect(core.amount(value)).toBeGreaterThanOrEqual(0);
+    }));
+  });
+});
+
+describe('acerto entre quantidade livre de participantes', () => {
+  it('divide centavos sem criar ou perder dinheiro', () => {
+    const people = [participant('A', 0), participant('B', 1), participant('C', 2)];
+    const result = core.calculateSettlements([
+      expense({ paidById: people[0].id, splitBetweenIds: people.map((item) => item.id), amount: 100 }),
+    ], people, { month: '2026-09' });
+
+    expect(result.balances.map((item) => item.amount)).toEqual([66.66, -33.33, -33.33]);
+    expect(result.transfers.map((item) => item.amount)).toEqual([33.33, 33.33]);
+  });
+
+  it('respeita exatamente o subconjunto escolhido no lançamento', () => {
+    const people = [participant('A', 0), participant('B', 1), participant('C', 2)];
+    const result = core.calculateSettlements([
+      expense({ paidById: people[0].id, splitBetweenIds: [people[1].id, people[2].id], amount: 90 }),
+    ], people, { month: '2026-09' });
+    expect(result.balances.map((item) => item.amount)).toEqual([90, -45, -45]);
+  });
+
+  it('mantém a soma dos saldos em zero para grupos de 2 a 8 pessoas', () => {
+    fc.assert(fc.property(
+      fc.integer({ min: 2, max: 8 }),
+      fc.integer({ min: 1, max: 1_000_000 }),
+      (count, cents) => {
+        const people = Array.from({ length: count }, (_, index) => participant(`Nome ${index}`, index));
+        const result = core.calculateSettlements([
+          expense({ paidById: people[0].id, splitBetweenIds: people.map((item) => item.id), amount: cents / 100 }),
+        ], people, { month: '2026-09' });
+        const sumInCents = result.balances.reduce((sum, item) => sum + Math.round(item.amount * 100), 0);
+        expect(sumInCents).toBe(0);
+      }
+    ));
+  });
+
+  it('ignora outros meses quando o período é informado', () => {
+    const people = [participant('A', 0), participant('B', 1)];
+    const result = core.calculateSettlements([
+      expense({ paidById: people[0].id, splitBetweenIds: people.map((item) => item.id), date: '2026-08-10' }),
+    ], people, { month: '2026-09' });
+    expect(result.transfers).toEqual([]);
+  });
+});
+
+describe('participantes e decisões', () => {
+  it('remove quem não tem histórico e arquiva quem está referenciado', () => {
+    const first = participant('A', 0);
+    const second = participant('B', 1);
+    const workspace = core.normalizeWorkspace({
+      participants: [first, second],
+      finances: [expense({ paidById: first.id, splitBetweenIds: [first.id, second.id] })],
     });
-    const depois = agora + VALIDADE_CONVITE + 1;
-    expect(aceitarConvite(store, codigo, convidado, depois).erro).toBe('expirou');
+
+    const referenced = core.removeParticipant(workspace, first.id);
+    expect(referenced.archived).toBe(true);
+    expect(referenced.workspace.participants.find((item) => item.id === first.id).active).toBe(false);
+
+    const unusedWorkspace = core.normalizeWorkspace({ participants: [first, second] });
+    const unused = core.removeParticipant(unusedWorkspace, second.id);
+    expect(unused.archived).toBe(false);
+    expect(unused.workspace.participants.some((item) => item.id === second.id)).toBe(false);
   });
 
-  it('no sucesso adiciona o membro e grava o ponteiro de associação', () => {
-    const { store, codigo } = cenario();
-    const res = aceitarConvite(store, codigo, convidado, agora);
-
-    expect(res).toEqual({ ok: true, casalId: dono.uid });
-    expect(store.getDoc('casais', dono.uid).membros).toEqual({
-      [dono.email]: 'Ana',
-      [convidado.email]: 'Bruno',
+  it('mantém no máximo um voto por participante e permite trocar ou retirar', () => {
+    const voter = participant('Votante', 0);
+    let workspace = core.normalizeWorkspace({
+      participants: [voter],
+      decisions: [{
+        id: 'decision-1', title: 'Escolha', status: 'open',
+        options: [
+          { id: 'option-a', label: 'A', voterIds: [] },
+          { id: 'option-b', label: 'B', voterIds: [] },
+        ],
+      }],
     });
-    expect(store.getDoc('casais', convidado.uid)).toEqual({ casalIdRef: dono.uid });
+
+    workspace = core.vote(workspace, 'decision-1', 'option-a', voter.id).workspace;
+    workspace = core.vote(workspace, 'decision-1', 'option-b', voter.id).workspace;
+    expect(workspace.decisions[0].options.map((item) => item.voterIds)).toEqual([[], [voter.id]]);
+
+    workspace = core.vote(workspace, 'decision-1', 'option-b', voter.id).workspace;
+    expect(workspace.decisions[0].options.map((item) => item.voterIds)).toEqual([[], []]);
   });
 
-  it('preserva os dados do espaço ao adicionar o membro', () => {
-    const { store, codigo } = cenario();
-    salvarCampo(store, dono.uid, 'financas', [{ id: 'f1', valor: 10 }]);
-    aceitarConvite(store, codigo, convidado, agora);
-    expect(lerCampo(store, dono.uid, 'financas')).toEqual([{ id: 'f1', valor: 10 }]);
+  it('não aceita voto de participante arquivado ou em decisão encerrada', () => {
+    const voter = { ...participant('Votante', 0), active: false };
+    const workspace = core.normalizeWorkspace({
+      participants: [voter],
+      decisions: [{
+        id: 'decision-1', title: 'Escolha', status: 'closed',
+        options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }],
+      }],
+    });
+    expect(core.vote(workspace, 'decision-1', 'a', voter.id).changed).toBe(false);
   });
+});
 
-  it('usa a parte local do e-mail quando o convidado não tem displayName', () => {
-    const { store, codigo } = cenario();
-    aceitarConvite(store, codigo, { ...convidado, displayName: null }, agora);
-    expect(store.getDoc('casais', dono.uid).membros[convidado.email]).toBe('bruno');
+describe('recorrência mensal', () => {
+  it('materializa todos os meses ausentes e respeita ocorrências removidas', () => {
+    const payer = participant('Pagador', 0);
+    let workspace = core.normalizeWorkspace({
+      participants: [payer],
+      finances: [{
+        ...expense({ id: 'series-1', paidById: payer.id, splitBetweenIds: [payer.id], amount: 49.9, date: '2026-01-31' }),
+        recurring: true,
+        recurrenceSeriesId: 'series-1',
+        recurrenceSkippedMonths: [],
+      }],
+    });
+
+    let result = core.materializeRecurring(workspace, '2026-04');
+    expect(result.added).toBe(3);
+    expect(result.workspace.finances.map((item) => item.date).sort()).toEqual([
+      '2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30',
+    ]);
+
+    const march = result.workspace.finances.find((item) => item.occurrenceMonth === '2026-03');
+    workspace = core.removeFinance(result.workspace, march.id).workspace;
+    expect(workspace.finances.find((item) => item.id === 'series-1').recurrenceSkippedMonths).toContain('2026-03');
+
+    result = core.materializeRecurring(workspace, '2026-04');
+    expect(result.added).toBe(0);
+    expect(result.workspace.finances.some((item) => item.occurrenceMonth === '2026-03')).toBe(false);
   });
+});
 
-  it('nenhum caminho de erro escreve no store', () => {
-    fc.assert(
-      fc.property(fc.constantFrom('invalido', 'expirou', 'cheio', 'ja_membro'), (caso) => {
-        const overrides = {};
-        if (caso === 'cheio') overrides.membros = { [dono.email]: 'Ana', 'carla@exemplo.com': 'Carla' };
-        if (caso === 'ja_membro') overrides.membros = { [convidado.email]: 'Bruno' };
-        const { store, codigo } = cenario(overrides);
+describe('competência de recorrência', () => {
+  it('não usa a data editada de uma ocorrência para suprimir o mês seguinte', () => {
+    const payer = participant('Pagador', 0);
+    let workspace = core.normalizeWorkspace({
+      participants: [payer],
+      finances: [{
+        ...expense({ id: 'series-move', paidById: payer.id, splitBetweenIds: [payer.id], date: '2026-01-10' }),
+        recurring: true,
+        recurrenceSeriesId: 'series-move',
+        recurrenceSkippedMonths: [],
+      }],
+    });
+    workspace = core.materializeRecurring(workspace, '2026-03').workspace;
+    const march = workspace.finances.find((item) => item.occurrenceMonth === '2026-03');
+    march.date = '2026-04-15';
 
-        const antes = structuredClone(store.dados);
-        const quando = caso === 'expirou' ? agora + VALIDADE_CONVITE + 1 : agora;
-        const res = aceitarConvite(store, caso === 'invalido' ? 'ZZZZZZZZ' : codigo, convidado, quando);
+    const result = core.materializeRecurring(workspace, '2026-04');
+    expect(result.added).toBe(1);
+    expect(result.workspace.finances.filter((item) => item.occurrenceMonth === '2026-04')).toHaveLength(1);
+  });
+});
 
-        expect(res.ok).toBe(false);
-        expect(res.erro).toBe(caso);
-        expect(store.dados).toEqual(antes);
-      })
-    );
+describe('encerramento de série recorrente', () => {
+  it('desanexa ocorrências históricas ao excluir a fonte', () => {
+    const payer = participant('Pagador', 0);
+    let workspace = core.normalizeWorkspace({
+      participants: [payer],
+      finances: [{
+        ...expense({ id: 'series-delete', paidById: payer.id, splitBetweenIds: [payer.id], date: '2026-01-10' }),
+        recurring: true,
+        recurrenceSeriesId: 'series-delete',
+        recurrenceSkippedMonths: [],
+      }],
+    });
+    workspace = core.materializeRecurring(workspace, '2026-03').workspace;
+    workspace = core.removeFinance(workspace, 'series-delete').workspace;
+
+    expect(workspace.finances).toHaveLength(2);
+    expect(workspace.finances.every((item) => item.recurringSourceId === null)).toBe(true);
+    expect(workspace.finances.every((item) => item.recurrenceSeriesId === null)).toBe(true);
+    expect(workspace.finances.every((item) => item.occurrenceMonth === null)).toBe(true);
   });
 });

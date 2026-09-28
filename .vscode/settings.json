@@ -1,23 +1,6 @@
-// Configuração do Live Server (extensão ritwickdey.LiveServer) para o PlannerDuo.
-// Formato JSONC: o VS Code aceita comentários neste arquivo.
+// Configuração opcional da extensão Live Server.
 {
-  // Raiz servida pelo Live Server, relativa à raiz do workspace.
-  // É `public/` porque esse é o diretório que o firebase.json publica (hosting.public).
-  // Sem isso, o Live Server serve a raiz do repositório e mostra a listagem de arquivos
-  // em vez da landing (public/index.html).
   "liveServer.settings.root": "/public",
-
-  // Host fixado em `localhost` (o padrão da extensão é 127.0.0.1). Mantém o mesmo
-  // host quando o Firebase for religado no futuro (Authorized domains autoriza
-  // localhost de fábrica).
   "liveServer.settings.host": "localhost",
-
-  // Porta fixada para que a porta documentada seja a porta real.
   "liveServer.settings.port": 5500
-
-  // NÃO usar liveServer.settings.mount: o Live Server casa mount por PREFIXO,
-  // então uma regra "/app" captura também "/app.js" e o serve como app.html,
-  // quebrando o app com "Unexpected token '<'". Acesse as páginas diretamente
-  // por /app.html, /auth.html e /index.html (raiz). Para rotas sem extensão
-  // (/app, /auth) com paridade ao Firebase Hosting, use `npm run dev`.
 }

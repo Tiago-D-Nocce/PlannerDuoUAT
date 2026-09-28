@@ -1,68 +1,65 @@
-# PlannerDuo1.0
+# PlannerDuo
 
-PlannerDuo de Produção — aplicação web privada para casais gerenciarem finanças
-compartilhadas, viagens e metas.
+Aplicação web local para organizar finanças, viagens, metas, checklists e decisões de um grupo livre de participantes.
 
-## Como rodar (modo local)
+## Estado atual
 
-O PlannerDuo está em modo local: abre direto no painel, sem login, salvando no
-navegador (localStorage). O Firebase está desligado — para religar, troque
-`MODO` para `'firebase'` em `public/app.js`.
+- funciona integralmente em `localhost`, sem conta, login ou backend;
+- começa com um banco vazio e não importa automaticamente dados de versões anteriores;
+- permite zero, um ou vários participantes, todos com identificadores estáveis;
+- divide despesas somente entre os participantes escolhidos em cada lançamento;
+- mantém os dados no `localStorage` do navegador e serializa alterações entre abas com Web Locks;
+- oferece backup/restauração JSON, exportação financeira CSV e reset completo;
+- pesquisa viagens em 12 provedores: comparadores, companhias aéreas, hospedagens, ônibus e rotas;
+- não carrega SDKs, fontes, ícones, gráficos ou folhas de estilo externos.
 
-- **Recomendado (um clique):** no VS Code, pressione F5 e escolha
-  "PlannerDuo (local)". O servidor sobe e o navegador abre em
-  `http://localhost:5500/app.html`.
-- **Alternativa (terminal):** `npm run dev` e abra `http://localhost:5500/`.
-- **Live Server:** se usar a extensão, acesse por `app.html`/`index.html`
-  diretamente e **não** configure `mount` para `/app` — o Live Server casa o
-  mount por prefixo e captura `/app.js`, servindo-o como HTML e quebrando o app.
+> Os dados pertencem à combinação navegador + perfil + origem (`localhost:porta`). Faça backups antes de limpar dados do site, trocar de navegador ou mudar a porta usada no dia a dia.
 
-## Estrutura
+## Busca de viagens
 
-```
-public/          # tudo que vai para o Firebase Hosting
-  index.html     # landing pública
-  auth.html      # login / cadastro / reset (script próprio, não usa app.js)
-  app.html       # painel do casal
-  app.js         # estado, Firestore, controladores e renderização
-  core.js        # lógica pura (Espaço_Casal e Convites), testável sem Firebase
-  style.css      # design system + telas
-firestore.rules  # regras de acesso
-firebase.json    # hosting (serve public/) + rewrites /app e /auth
-scripts/         # utilitários de desenvolvimento (sem dependências)
-tests/           # vitest + fast-check sobre core.js e os helpers de app.js
-```
+Na aba **Viagens**, informe origem, destino, datas e quantidade de viajantes. Google Voos, Airbnb, Booking.com e Rome2Rio recebem os dados disponíveis; KAYAK e Skyscanner também recebem a rota quando origem e destino usam códigos IATA, como `CNF` ou `GRU`, **e uma data de ida foi informada**. Sem esses três dados, eles abrem a página inicial de busca. GOL, Azul, LATAM, Decolar, Buser e ClickBus abrem suas páginas oficiais porque esses fluxos não possuem um deep link público estável mantido pelo PlannerDuo.
 
-O diretório servido é `public/`. Manter os assets na raiz faz o
-`firebase deploy` publicar um site vazio e expor arquivos do repositório.
+Nenhum provedor é acessado durante a inicialização. A navegação HTTPS acontece somente depois de um clique do usuário, em nova aba com `noopener` e `noreferrer`. O formulário permanece local; para páginas sem preenchimento automático, o resumo pode ser copiado para a área de transferência.
 
-## Rodar localmente
+## Executar
 
 ```bash
 npm install
-npm run dev          # http://localhost:5500
+npm run dev
 ```
 
-O Firebase Auth não funciona sob `file://` — é preciso servir por HTTP.
-O `scripts/dev-server.mjs` reproduz os rewrites declarados em `firebase.json`
-(`/app` → `app.html`, `/auth` → `auth.html`, resto → `index.html`).
+Abra `http://localhost:5500/` ou diretamente `http://localhost:5500/app.html`.
 
-## Testes e verificação
+No VS Code, também é possível pressionar **F5** e escolher **PlannerDuo (local)**.
+
+## Estrutura
+
+```text
+public/
+  index.html   # apresentação e entrada direta
+  auth.html    # redirecionamento de compatibilidade para o app
+  app.html     # shell acessível da aplicação
+  app.js       # interações, CRUD, busca de viagens, relatórios e renderização
+  core.js      # schema, normalização, votos e acerto de despesas
+  local.js     # persistência, backup, importação e sincronização entre abas
+  style.css    # design system responsivo, sem assets externos
+scripts/
+  dev-server.mjs          # servidor HTTP local
+  verificar-frontend.mjs  # sintaxe, referências, política local e smoke HTTP
+```
+
+## Dados locais
+
+O banco atual usa a chave `plannerduo:workspace:v1`. Na primeira execução desta versão, chaves conhecidas do sistema antigo são removidas para garantir um início limpo. O tema visual fica separado em `plannerduo:theme`.
+
+Participantes referenciados por transações ou votos são arquivados em vez de apagados, preservando o significado do histórico. Participantes sem referências podem ser removidos de forma permanente.
+
+## Verificação
 
 ```bash
-npm test             # vitest --run
-npm run verificar    # com o dev-server no ar: checa sintaxe e referências
+npm run verificar
 ```
 
-`npm run verificar` confere que `app.js`/`core.js` têm sintaxe válida, que toda
-referência local em `href`/`src` existe dentro de `public/` e que cada rota
-devolve o arquivo correto — o fallback de SPA responde 200 até para arquivo
-inexistente, então a checagem compara o corpo servido com o disco.
+O verificador executa primeiro a suíte Vitest e depois inicia um servidor temporário para checar sintaxe JavaScript, referências locais, CSS, ausência de assets remotos e os principais caminhos HTTP; ele encerra o servidor ao terminar.
 
-## Deploy
-
-```bash
-firebase deploy --only hosting,firestore:rules
-```
-
-As regras são validadas pelo Firebase no momento do deploy.
+A suíte Vitest cobre schema vazio, normalização, valores monetários, divisão entre grupos, votos, participantes, limpeza legada, persistência, backup, reset, sincronização entre abas, entrada direta e a allowlist dos destinos de viagem.

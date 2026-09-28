@@ -1,11 +1,11 @@
 {
   "name": "plannerduo",
   "version": "1.0.0",
-  "description": "Aplicação web privada para casais gerenciarem finanças compartilhadas e planejamento de viagens.",
+  "description": "Aplicação web local para organizar finanças, viagens, metas, checklists e decisões compartilhadas.",
   "private": true,
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
-    "verificar": "node scripts/verificar-frontend.mjs",
+    "verificar": "vitest --run && node scripts/verificar-frontend.mjs",
     "test": "vitest --run",
     "test:watch": "vitest"
   },
