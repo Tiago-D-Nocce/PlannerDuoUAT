@@ -1,19 +1,91 @@
 <!doctype html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-  <meta http-equiv="refresh" content="0; url=app.html">
-  <title>Acesso local — PlannerDuo</title>
+  <meta name="description" content="Desbloqueie o cofre local criptografado do PlannerDuo.">
+  <title>Entrar no cofre — PlannerDuo</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="redirect-page">
-  <main class="redirect-card">
-    <div class="loading-mark" aria-hidden="true">P</div>
-    <h1>O PlannerDuo agora abre direto.</h1>
-    <p>Não existe mais conta ou tela de login. Seus dados permanecem somente neste navegador.</p>
-    <a class="button primary" href="app.html">Abrir workspace local</a>
+<body class="vault-auth-page">
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+  <a class="auth-back-link" href="index.html">← Voltar ao início</a>
+
+  <main class="vault-auth-shell">
+    <section class="vault-auth-visual" aria-labelledby="auth-brand-title">
+      <div class="vault-auth-brand">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <span class="brand-copy">Planner<span>Duo</span></span>
+      </div>
+      <div class="vault-auth-copy">
+        <span class="vault-auth-kicker">SEGURANÇA LOCAL</span>
+        <h1 id="auth-brand-title">Seus planos ficam legíveis <em>somente depois do login.</em></h1>
+        <p>O workspace é criptografado no navegador. A senha não é enviada para servidor algum e não fica gravada no banco.</p>
+      </div>
+      <div class="vault-security-list">
+        <article><span>⌁</span><div><strong>AES-GCM 256 bits</strong><small>Conteúdo cifrado e autenticado a cada gravação</small></div></article>
+        <article><span>⌗</span><div><strong>PBKDF2-SHA-256</strong><small>600 mil iterações e salt exclusivo do cofre</small></div></article>
+        <article><span>◷</span><div><strong>Sessão temporária</strong><small>A chave sai da sessão ao bloquear ou fechar a aba</small></div></article>
+      </div>
+      <p class="vault-local-limit">Proteção local: nome/e-mail ficam visíveis; extensões ou scripts da mesma origem podem acessar uma sessão desbloqueada.</p>
+    </section>
+
+    <section class="vault-auth-card" aria-live="polite">
+      <div id="auth-loading" class="auth-state active">
+        <div class="vault-loader" aria-hidden="true"><i></i></div>
+        <h2>Verificando o cofre local</h2>
+        <p>Isso acontece somente neste navegador.</p>
+      </div>
+
+      <div id="auth-unlock" class="auth-state">
+        <div class="auth-state-heading">
+          <span class="auth-state-icon" aria-hidden="true">⌾</span>
+          <div><span class="eyebrow">COFRE PROTEGIDO</span><h2>Bem-vindo de volta</h2><p>Entre para descriptografar seu workspace.</p></div>
+        </div>
+        <div class="local-account-chip"><span id="unlock-account-avatar">?</span><div><strong id="unlock-account-name">Conta local</strong><small id="unlock-account-email"></small></div></div>
+        <form id="unlock-form" class="vault-form" novalidate>
+          <label><span>E-mail local</span><input id="unlock-email" type="email" autocomplete="username" maxlength="254" required></label>
+          <label><span>Senha</span><div class="password-field"><input id="unlock-password" type="password" autocomplete="current-password" maxlength="128" required autofocus><button type="button" data-toggle-password="unlock-password" aria-label="Mostrar senha">◉</button></div></label>
+          <button class="button primary vault-submit" type="submit"><span aria-hidden="true">↗</span> Desbloquear workspace</button>
+        </form>
+        <button class="auth-text-action" type="button" data-auth-view="recovery">Esqueci a senha</button>
+        <p class="auth-security-hint">Não há recuperação por e-mail. Sem a senha, os dados criptografados não podem ser lidos.</p>
+      </div>
+
+      <div id="auth-setup" class="auth-state">
+        <div class="auth-state-heading">
+          <span class="auth-state-icon secure" aria-hidden="true">✦</span>
+          <div><span class="eyebrow">PRIMEIRO ACESSO</span><h2>Crie seu cofre local</h2><p>Defina as credenciais que protegerão este navegador.</p></div>
+        </div>
+        <div id="legacy-migration-notice" class="migration-notice" hidden><strong>Seus dados atuais serão preservados</strong><span>O workspace existente será criptografado e a cópia legível só será removida após a verificação.</span></div>
+        <form id="setup-vault-form" class="vault-form" novalidate>
+          <div class="form-grid two"><label><span>Seu nome</span><input id="setup-account-name" maxlength="60" autocomplete="name" placeholder="Como devemos chamar você?" required></label><label><span>E-mail local</span><input id="setup-account-email" type="email" maxlength="254" autocomplete="username" placeholder="voce@exemplo.com" required></label></div>
+          <label><span>Crie uma senha</span><div class="password-field"><input id="setup-account-password" type="password" maxlength="128" autocomplete="new-password" placeholder="Mínimo de 10 caracteres" required><button type="button" data-toggle-password="setup-account-password" aria-label="Mostrar senha">◉</button></div></label>
+          <div class="password-strength" id="password-strength" data-level="0"><i></i><i></i><i></i><i></i><span>Use letras, números e uma frase difícil de adivinhar.</span></div>
+          <label><span>Confirme a senha</span><div class="password-field"><input id="setup-account-confirm" type="password" maxlength="128" autocomplete="new-password" required><button type="button" data-toggle-password="setup-account-confirm" aria-label="Mostrar senha">◉</button></div></label>
+          <label class="auth-agreement"><input id="setup-no-recovery" type="checkbox" required><span>Entendo que não existe recuperação da senha e farei backups do cofre.</span></label>
+          <button class="button primary vault-submit" type="submit"><span aria-hidden="true">⌗</span> Criar cofre e entrar</button>
+        </form>
+      </div>
+
+      <div id="auth-recovery" class="auth-state">
+        <div class="auth-state-heading danger-heading">
+          <span class="auth-state-icon danger" aria-hidden="true">!</span>
+          <div><span class="eyebrow">SEM RECUPERAÇÃO</span><h2>Não lembra a senha?</h2><p>A criptografia impede redefinir a senha sem conhecer a atual.</p></div>
+        </div>
+        <div class="recovery-warning"><strong id="recovery-warning-title">Último recurso</strong><p id="recovery-warning-text">Você pode apagar o cofre deste navegador e recomeçar. Isso elimina permanentemente finanças, viagens, metas, votos e participantes.</p></div>
+        <button class="button ghost vault-raw-download" id="download-raw-vault" type="button" hidden>Baixar cópia bruta antes de apagar</button>
+        <label><span>Digite APAGAR para confirmar</span><input id="destroy-vault-confirmation" autocomplete="off" placeholder="APAGAR"></label>
+        <div class="auth-recovery-actions"><button class="button ghost" type="button" data-auth-view="unlock">Voltar ao login</button><button class="button danger" id="destroy-vault-button" type="button">Apagar cofre definitivamente</button></div>
+      </div>
+
+      <div id="auth-status" class="auth-inline-status" role="status" aria-live="polite"></div>
+    </section>
   </main>
+
+  <script src="core.js"></script>
+  <script src="local.js"></script>
+  <script src="auth.js"></script>
 </body>
 </html>

@@ -14,8 +14,8 @@
 
   <div id="app-loading" class="app-loading" role="status" aria-live="polite">
     <div class="loading-mark" aria-hidden="true">P</div>
-    <strong>Preparando seu workspace local</strong>
-    <span>Sem conta, sem nuvem e sem dados de demonstração.</span>
+    <strong>Abrindo seu cofre local</strong>
+    <span>Validando a sessão e descriptografando os dados.</span>
   </div>
 
   <div class="app-shell" id="app-shell" hidden>
@@ -30,8 +30,12 @@
         <div class="workspace-mini-icon" id="workspace-mini-icon">✦</div>
         <div class="workspace-mini-copy">
           <strong id="sidebar-workspace-name">Meu workspace</strong>
-          <span><i class="status-dot"></i> salvo neste navegador</span>
+          <span><i class="status-dot"></i> cofre criptografado</span>
         </div>
+      </div>
+      <div class="sidebar-account" id="sidebar-account">
+        <span class="sidebar-account-avatar" id="sidebar-account-avatar">?</span>
+        <div><strong id="sidebar-account-name">Conta local</strong><small id="sidebar-account-email">Cofre desbloqueado</small></div>
       </div>
       <div class="participant-stack" id="sidebar-participants" aria-label="Participantes"></div>
 
@@ -50,7 +54,8 @@
 
       <div class="sidebar-footer">
         <button class="icon-button dark" type="button" data-action="toggle-theme" aria-label="Alternar tema" title="Alternar tema"><span id="theme-icon">◐</span></button>
-        <div class="local-badge"><span>●</span> Modo local</div>
+        <div class="local-badge"><span>●</span> Cofre aberto</div>
+        <button class="icon-button dark" type="button" data-action="lock-vault" aria-label="Bloquear e sair" title="Bloquear e sair">⌑</button>
       </div>
     </aside>
 
@@ -58,7 +63,7 @@
       <header class="mobile-header">
         <button class="icon-button" type="button" data-action="open-sidebar" aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar">☰</button>
         <div class="brand-copy">Planner<span>Duo</span></div>
-        <button class="icon-button" type="button" data-action="toggle-theme" aria-label="Alternar tema">◐</button>
+        <div class="mobile-header-actions"><button class="icon-button" type="button" data-action="toggle-theme" aria-label="Alternar tema">◐</button><button class="icon-button" type="button" data-action="lock-vault" aria-label="Bloquear e sair">⌑</button></div>
       </header>
 
       <main id="main-content">
@@ -146,7 +151,7 @@
                 <h2>Encontre a melhor opção para sua viagem</h2>
                 <p>Preencha uma vez e escolha onde pesquisar passagens, hospedagens ou rotas.</p>
               </div>
-              <span class="travel-search-badge"><i></i> 12 provedores</span>
+              <span class="travel-search-badge"><i></i> <span id="travel-provider-count">26 provedores</span></span>
             </div>
 
             <form id="travel-search-form" class="travel-search-form" novalidate>
@@ -165,11 +170,12 @@
                 <button type="button" data-travel-provider-filter="flights" aria-pressed="false">Voos</button>
                 <button type="button" data-travel-provider-filter="stays" aria-pressed="false">Hospedagem</button>
                 <button type="button" data-travel-provider-filter="ground" aria-pressed="false">Ônibus e rotas</button>
+                <button type="button" data-travel-provider-filter="cars" aria-pressed="false">Carros</button>
               </div>
               <span class="travel-privacy-note">Seus dados só vão ao site escolhido após o clique.</span>
             </div>
             <div class="travel-provider-grid" id="travel-provider-grid"></div>
-            <div class="travel-search-status" id="travel-search-status">Dica: KAYAK e Skyscanner precisam de códigos IATA e data de ida para preencher a rota automaticamente.</div>
+            <div class="travel-search-status" id="travel-search-status">Sites marcados “Datas na busca” recebem o período na URL; os demais mostram claramente quando é necessário confirmar ou preencher no site.</div>
           </article>
 
           <div class="travel-plans-heading"><div><span class="eyebrow">SEUS ROTEIROS</span><h2>Viagens planejadas</h2></div><span class="muted">Use “Buscar preços” para reaproveitar destino e datas.</span></div>
@@ -214,16 +220,23 @@
               <div id="participant-settings-list" class="participant-settings-list"></div>
               <form id="participant-form" class="participant-add-form"><input id="participant-name-input" maxlength="40" placeholder="Nome do participante" aria-label="Nome do novo participante" required><input id="participant-color-input" type="color" value="#6366f1" aria-label="Cor do participante"><button class="button primary" type="submit">Adicionar</button></form>
             </article>
+            <article class="panel security-card">
+              <div class="panel-heading"><div><span class="eyebrow">CONTA E SEGURANÇA</span><h2>Cofre local</h2></div><span class="privacy-icon">⌗</span></div>
+              <div class="security-account-summary"><span id="security-account-avatar" aria-hidden="true">⌾</span><div><strong id="security-account-name">Conta local</strong><small id="security-account-email"></small></div><span class="security-state">Protegido</span></div>
+              <p class="panel-description">AES-GCM protege o conteúdo em repouso. A sessão desta aba bloqueia automaticamente após 30 minutos sem atividade.</p>
+              <div class="button-row"><button class="button ghost" type="button" data-action="open-security">Alterar senha</button><button class="button ghost" type="button" data-action="lock-vault">Bloquear agora</button></div>
+              <div class="legacy-conflict" id="legacy-conflict" hidden><strong>Cópia legível detectada</strong><span>Uma aba antiga gravou dados após a migração. Baixe e confira antes de descartar.</span><div class="button-row"><button class="button ghost small" type="button" data-action="export-legacy-conflict">Baixar cópia</button><button class="button danger small" type="button" data-action="discard-legacy-conflict">Descartar cópia</button></div></div>
+            </article>
             <article class="panel privacy-card">
-              <div class="panel-heading"><div><span class="eyebrow">PRIVACIDADE REAL</span><h2>Somente neste navegador</h2></div><span class="privacy-icon">◉</span></div>
-              <p>O workspace não possui conta nem sincronização externa. Faça backups periódicos para não perder os dados ao limpar o navegador.</p>
+              <div class="panel-heading"><div><span class="eyebrow">PRIVACIDADE LOCAL</span><h2>Criptografado neste navegador</h2></div><span class="privacy-icon">◉</span></div>
+              <p>Não há nuvem nem recuperação por e-mail. O conteúdo só é legível enquanto esta aba possui uma sessão desbloqueada.</p>
               <dl id="data-summary"></dl>
             </article>
             <article class="panel">
-              <div class="panel-heading"><div><span class="eyebrow">PORTABILIDADE</span><h2>Backup e restauração</h2></div></div>
-              <p class="panel-description">Exporte tudo em JSON ou restaure um backup compatível. A importação substitui o workspace atual.</p>
-              <div class="button-row"><button class="button ghost" type="button" data-action="export-backup">Baixar backup</button><button class="button ghost" type="button" data-action="choose-import">Importar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div>
-              <div class="danger-zone"><div><strong>Recomeçar do zero</strong><span>Remove permanentemente todos os dados locais deste workspace.</span></div><button class="button danger" type="button" data-action="reset-workspace">Apagar dados locais</button></div>
+              <div class="panel-heading"><div><span class="eyebrow">PORTABILIDADE SEGURA</span><h2>Backup e restauração</h2></div></div>
+              <p class="panel-description">O backup padrão permanece criptografado e exige a senha usada quando foi criado. A importação também aceita o JSON legível antigo após confirmação.</p>
+              <div class="button-row"><button class="button ghost" type="button" data-action="export-backup">Baixar cofre criptografado</button><button class="button ghost" type="button" data-action="choose-import">Importar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div>
+              <div class="danger-zone"><div><strong>Recomeçar mantendo a conta</strong><span>Apaga o conteúdo do workspace, mas preserva e-mail, senha e criptografia.</span></div><button class="button danger" type="button" data-action="reset-workspace">Apagar dados locais</button></div>
             </article>
           </div>
         </section>
@@ -270,8 +283,28 @@
     <form id="setup-form"><div class="setup-visual" aria-hidden="true"><span>✦</span><i></i><i></i></div><div class="dialog-header"><div><span class="eyebrow">COMECE EM BRANCO</span><h2>Monte seu workspace</h2><p>Não há perfis predefinidos. Você decide o nome e quem participa.</p></div><button class="dialog-close" type="button" data-action="dismiss-setup" aria-label="Fechar">×</button></div><label><span>Nome do workspace <em>opcional</em></span><input id="setup-workspace-name" maxlength="60" placeholder="Dê um nome ao seu espaço"></label><label><span>Participantes <em>opcional</em></span><textarea id="setup-participants" rows="4" placeholder="Digite um nome por linha"></textarea><small class="form-help">Você pode adicionar, renomear ou arquivar participantes depois.</small></label><div class="dialog-actions"><button class="button ghost" type="button" data-action="dismiss-setup">Decidir depois</button><button class="button primary" type="submit">Criar meu espaço</button></div></form>
   </dialog>
 
+  <dialog id="security-dialog" class="dialog small-dialog" aria-label="Alterar senha do cofre">
+    <form id="security-form">
+      <div class="dialog-header"><div><span class="eyebrow">SEGURANÇA</span><h2>Alterar senha do cofre</h2><p>Todo o conteúdo será recriptografado e as outras abas serão bloqueadas.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
+      <label><span>Senha atual</span><input id="security-current-password" type="password" autocomplete="current-password" maxlength="128" required></label>
+      <label><span>Nova senha</span><input id="security-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+      <label><span>Confirme a nova senha</span><input id="security-confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
+      <small class="form-help">Use pelo menos 10 caracteres, com letra e número. Não há recuperação por e-mail.</small>
+      <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Recriptografar e salvar</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="backup-password-dialog" class="dialog small-dialog" aria-label="Senha do backup">
+    <form id="backup-password-form">
+      <div class="dialog-header"><div><span class="eyebrow">BACKUP PROTEGIDO</span><h2>Desbloquear arquivo</h2><p>Use a senha que protegia o cofre quando este backup foi criado.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
+      <label><span>Senha do backup</span><input id="backup-password" type="password" autocomplete="off" maxlength="128" required></label>
+      <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Validar e importar</button></div>
+    </form>
+  </dialog>
+
   <script src="core.js"></script>
   <script src="local.js"></script>
+  <script src="travel.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

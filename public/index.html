@@ -4,35 +4,33 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
-  <meta name="description" content="Planner local para organizar finanças, viagens, metas e decisões sem conta ou servidor externo.">
-  <title>PlannerDuo — Planeje do seu jeito</title>
+  <meta name="description" content="Planner local criptografado para organizar finanças, viagens, metas e decisões.">
+  <title>PlannerDuo — Planeje com privacidade</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="landing-body">
   <nav class="landing-nav" aria-label="Navegação principal">
-    <a class="brand" href="index.html" aria-label="PlannerDuo — início">
-      <span class="brand-mark" aria-hidden="true">P</span>
-      <span class="brand-copy">Planner<span>Duo</span></span>
-    </a>
-    <a class="button soft" href="app.html">Abrir workspace</a>
+    <a class="brand" href="index.html" aria-label="PlannerDuo — início"><span class="brand-mark" aria-hidden="true">P</span><span class="brand-copy">Planner<span>Duo</span></span></a>
+    <a class="button soft" href="auth.html">Entrar no cofre</a>
   </nav>
 
   <main class="landing-hero">
     <div class="landing-glow" aria-hidden="true"></div>
     <div class="landing-content">
-      <span class="landing-pill"><i></i> 100% LOCAL · SEM LOGIN</span>
-      <h1>Planos compartilhados.<br><span>Decisões de verdade.</span></h1>
-      <p>Organize dinheiro, destinos, objetivos e votações em um workspace que começa vazio e se adapta às pessoas que você escolher.</p>
+      <span class="landing-pill"><i></i> COFRE LOCAL · AES-GCM</span>
+      <h1>Planos compartilhados.<br><span>Dados protegidos.</span></h1>
+      <p>Organize dinheiro, destinos, objetivos e votações em um workspace criptografado por uma senha que somente você conhece.</p>
       <div class="landing-actions">
-        <a class="button primary" href="app.html">Começar do zero →</a>
-        <a class="button soft" href="app.html#settings">Importar um backup</a>
+        <a class="button primary" href="auth.html">Criar ou desbloquear cofre →</a>
+        <a class="button soft" href="auth.html?next=app.html%23trips">Pesquisar viagens</a>
       </div>
       <div class="landing-features">
-        <article class="landing-feature"><span>↕</span><strong>Finanças flexíveis</strong><p>Divida cada gasto entre qualquer combinação de participantes.</p></article>
-        <article class="landing-feature"><span>⌁</span><strong>Planos completos</strong><p>Viagens, metas e checklists conectados no mesmo lugar.</p></article>
-        <article class="landing-feature"><span>◇</span><strong>Decisões abertas</strong><p>Opções, votos transparentes e nenhum perfil predefinido.</p></article>
-        <article class="landing-feature"><span>◉</span><strong>Dados sob controle</strong><p>Persistência no navegador com exportação e restauração JSON.</p></article>
+        <article class="landing-feature"><span>⌗</span><strong>Criptografia local</strong><p>PBKDF2 e AES-GCM protegem o banco enquanto o cofre está bloqueado.</p></article>
+        <article class="landing-feature"><span>⌁</span><strong>Busca multi-site</strong><p>Compare voos, hospedagens, ônibus e rotas com datas estruturadas.</p></article>
+        <article class="landing-feature"><span>◇</span><strong>Decisões abertas</strong><p>Opções, votos transparentes e participantes definidos por você.</p></article>
+        <article class="landing-feature"><span>◷</span><strong>Bloqueio automático</strong><p>A sessão da aba expira e pode ser encerrada em todos os painéis abertos.</p></article>
       </div>
+      <p class="landing-security-note">Sem servidor e sem recuperação remota: esquecer a senha torna o cofre irrecuperável. Faça backups criptografados.</p>
     </div>
   </main>
 </body>

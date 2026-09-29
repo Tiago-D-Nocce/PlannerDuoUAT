@@ -77,6 +77,8 @@ const server = createServer(async (request, response) => {
     'Content-Type': TYPES[extension] || 'application/octet-stream',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     'Referrer-Policy': 'no-referrer',
   });
   response.end(method === 'HEAD' ? undefined : body);

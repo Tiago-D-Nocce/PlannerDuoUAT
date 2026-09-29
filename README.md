@@ -1,25 +1,40 @@
 # PlannerDuo
 
-Aplicação web local para organizar finanças, viagens, metas, checklists e decisões de um grupo livre de participantes.
+Aplicação web local para organizar finanças, viagens, metas, checklists e decisões em um cofre criptografado por senha.
 
-## Estado atual
+## Segurança local
 
-- funciona integralmente em `localhost`, sem conta, login ou backend;
-- começa com um banco vazio e não importa automaticamente dados de versões anteriores;
-- permite zero, um ou vários participantes, todos com identificadores estáveis;
-- divide despesas somente entre os participantes escolhidos em cada lançamento;
-- mantém os dados no `localStorage` do navegador e serializa alterações entre abas com Web Locks;
-- oferece backup/restauração JSON, exportação financeira CSV e reset completo;
-- pesquisa viagens em 12 provedores: comparadores, companhias aéreas, hospedagens, ônibus e rotas;
-- não carrega SDKs, fontes, ícones, gráficos ou folhas de estilo externos.
+- todo acesso ao painel passa por `auth.html`;
+- o conteúdo do workspace é cifrado com AES-GCM de 256 bits;
+- a chave é derivada de e-mail + senha usando PBKDF2-SHA-256, 600.000 iterações e salt aleatório;
+- cada gravação usa um IV aleatório novo e metadados autenticados;
+- a chave derivada permanece somente no `sessionStorage` da aba desbloqueada;
+- bloquear ou fechar a aba remove a sessão; 30 minutos sem atividade bloqueiam automaticamente;
+- troca de senha recriptografa o banco e invalida outras sessões;
+- alterações entre abas são serializadas com Web Locks;
+- o backup padrão contém o envelope criptografado, nunca o workspace legível.
 
-> Os dados pertencem à combinação navegador + perfil + origem (`localhost:porta`). Faça backups antes de limpar dados do site, trocar de navegador ou mudar a porta usada no dia a dia.
+No primeiro acesso, se existir um workspace da versão sem login, ele é criptografado e verificado antes da remoção da cópia legível. Se a gravação ou a verificação falhar, os dados antigos são preservados.
+
+> O e-mail é apenas um identificador local e não é verificado. O nome e o e-mail da conta ficam visíveis no cabeçalho do cofre; o conteúdo do workspace fica cifrado. A chave derivada permanece no `sessionStorage` durante a sessão, portanto uma extensão maliciosa, XSS ou script comprometido da mesma origem poderia lê-la enquanto a aba estiver desbloqueada. Não existe servidor nem recuperação de senha. Esquecer a senha torna o cofre irrecuperável. A proteção cobre dados em repouso e abas bloqueadas; não substitui a senha do Windows e não protege alguém que já controla o computador ou a sessão aberta.
 
 ## Busca de viagens
 
-Na aba **Viagens**, informe origem, destino, datas e quantidade de viajantes. Google Voos, Airbnb, Booking.com e Rome2Rio recebem os dados disponíveis; KAYAK e Skyscanner também recebem a rota quando origem e destino usam códigos IATA, como `CNF` ou `GRU`, **e uma data de ida foi informada**. Sem esses três dados, eles abrem a página inicial de busca. GOL, Azul, LATAM, Decolar, Buser e ClickBus abrem suas páginas oficiais porque esses fluxos não possuem um deep link público estável mantido pelo PlannerDuo.
+A aba **Viagens** reúne 26 opções em quatro grupos:
 
-Nenhum provedor é acessado durante a inicialização. A navegação HTTPS acontece somente depois de um clique do usuário, em nova aba com `noopener` e `noreferrer`. O formulário permanece local; para páginas sem preenchimento automático, o resumo pode ser copiado para a área de transferência.
+- voos: Google Voos, KAYAK, Skyscanner, momondo, Kiwi.com, Expedia, Decolar, LATAM, GOL e Azul;
+- hospedagem: Airbnb, Booking.com, Expedia Hotéis, Hoteis.com, Hostelworld, Vrbo, Agoda e trivago;
+- ônibus e rotas: ClickBus, Buser, Rome2Rio, Omio, FlixBus e Busbud;
+- carros: Localiza e Booking Cars.
+
+Cada cartão mostra uma das modalidades:
+
+- **Datas na busca:** a ida/volta são colocadas nos campos ou no caminho estruturado do provedor;
+- **Datas com requisitos:** exige condições como códigos IATA (`CNF`, `GRU`) ou ida e volta;
+- **Busca assistida:** os dados entram em uma consulta, mas devem ser confirmados no site;
+- **Preencher no site:** o provedor não oferece um deep link público estável; o PlannerDuo abre a página oficial e copia o resumo quando permitido.
+
+Nenhum provedor é acessado durante a inicialização. A navegação ocorre somente após clique explícito, por HTTPS e em nova aba com `noopener`/`noreferrer`. Ícones são SVGs internos; não há logos, scripts ou imagens baixados em segundo plano.
 
 ## Executar
 
@@ -28,31 +43,33 @@ npm install
 npm run dev
 ```
 
-Abra `http://localhost:5500/` ou diretamente `http://localhost:5500/app.html`.
+Abra `http://localhost:5500/`. No primeiro acesso, escolha **Criar cofre**; nos seguintes, use o e-mail local e a senha definida.
 
 No VS Code, também é possível pressionar **F5** e escolher **PlannerDuo (local)**.
 
-## Estrutura
+## Arquivos principais
 
 ```text
 public/
-  index.html   # apresentação e entrada direta
-  auth.html    # redirecionamento de compatibilidade para o app
-  app.html     # shell acessível da aplicação
-  app.js       # interações, CRUD, busca de viagens, relatórios e renderização
+  index.html   # apresentação e entrada pelo login
+  auth.html    # cadastro, desbloqueio e recuperação destrutiva
+  auth.js      # fluxo da conta e da sessão local
+  app.html     # shell autenticado da aplicação
+  app.js       # CRUD, relatórios, bloqueio e integração da busca
+  travel.js    # registry, SVGs, validação e builders dos 26 provedores
   core.js      # schema, normalização, votos e acerto de despesas
-  local.js     # persistência, backup, importação e sincronização entre abas
-  style.css    # design system responsivo, sem assets externos
+  local.js     # criptografia, cofre, sessão, migração e concorrência
+  style.css    # design system responsivo sem assets externos
 scripts/
   dev-server.mjs          # servidor HTTP local
-  verificar-frontend.mjs  # sintaxe, referências, política local e smoke HTTP
+  verificar-frontend.mjs  # testes, sintaxe, referências e smoke HTTP
 ```
 
-## Dados locais
+## Backup e restauração
 
-O banco atual usa a chave `plannerduo:workspace:v1`. Na primeira execução desta versão, chaves conhecidas do sistema antigo são removidas para garantir um início limpo. O tema visual fica separado em `plannerduo:theme`.
+Em **Configurações → Backup e restauração**, o download padrão é o envelope cifrado. Um backup atual pode ser restaurado diretamente enquanto a mesma chave estiver ativa; backups feitos antes de uma troca de senha solicitam a senha antiga em um campo protegido. O importador também aceita o JSON legível da versão anterior, valida seu schema e o recriptografa imediatamente.
 
-Participantes referenciados por transações ou votos são arquivados em vez de apagados, preservando o significado do histórico. Participantes sem referências podem ser removidos de forma permanente.
+**Apagar dados locais** zera o conteúdo, mas mantém conta e senha. **Esqueci a senha → Apagar cofre** elimina conta, ciphertext e conteúdo de forma definitiva.
 
 ## Verificação
 
@@ -60,6 +77,4 @@ Participantes referenciados por transações ou votos são arquivados em vez de 
 npm run verificar
 ```
 
-O verificador executa primeiro a suíte Vitest e depois inicia um servidor temporário para checar sintaxe JavaScript, referências locais, CSS, ausência de assets remotos e os principais caminhos HTTP; ele encerra o servidor ao terminar.
-
-A suíte Vitest cobre schema vazio, normalização, valores monetários, divisão entre grupos, votos, participantes, limpeza legada, persistência, backup, reset, sincronização entre abas, entrada direta e a allowlist dos destinos de viagem.
+O gate executa Vitest e depois inicia um servidor temporário. Ele valida criptografia/migração/senha/sessão/concorrência/backup, os builders de datas e hosts permitidos, os SVGs, sintaxe JavaScript, CSP, referências locais, ausência de assets remotos e os principais caminhos HTTP.

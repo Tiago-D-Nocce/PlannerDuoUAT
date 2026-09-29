@@ -6,12 +6,19 @@
   const Repository = window.PlannerLocal;
   const state = {
     workspace: null,
+    account: null,
     currentView: 'dashboard',
     decisionFilter: 'all',
     travelProviderFilter: 'all',
     voterByDecision: {},
+    pendingBackupSource: null,
     unsubscribe: null,
+    locking: false,
+    sessionExpiresAt: 0,
+    lastActivityAt: Date.now(),
+    autoLockTimer: null,
   };
+  const AUTO_LOCK_MS = 30 * 60 * 1000;
 
   const CATEGORY_META = Object.freeze({
     alimentacao: { label: 'Alimentação', icon: '🍽', color: '#f97316' },
@@ -36,35 +43,8 @@
     outros: 'Outros',
   });
 
-  const TRAVEL_PROVIDERS = Object.freeze([
-    { id: 'google-flights', name: 'Google Voos', group: 'flights', mark: 'G', accent: '#4285f4', description: 'Compare várias companhias', badge: 'Rota + datas' },
-    { id: 'kayak', name: 'KAYAK', group: 'flights', mark: 'K', accent: '#ff690f', description: 'Voos e combinações', badge: 'IATA + ida' },
-    { id: 'skyscanner', name: 'Skyscanner', group: 'flights', mark: 'S', accent: '#0770e3', description: 'Comparador global', badge: 'IATA + ida' },
-    { id: 'decolar', name: 'Decolar', group: 'flights', mark: 'D', accent: '#6b36d9', description: 'Passagens e pacotes', badge: 'Site oficial' },
-    { id: 'gol', name: 'GOL', group: 'flights', mark: 'GOL', accent: '#ff7020', description: 'Companhia aérea', badge: 'Site oficial' },
-    { id: 'azul', name: 'Azul', group: 'flights', mark: 'AZ', accent: '#006cb7', description: 'Companhia aérea', badge: 'Site oficial' },
-    { id: 'latam', name: 'LATAM', group: 'flights', mark: 'LA', accent: '#d71969', description: 'Companhia aérea', badge: 'Site oficial' },
-    { id: 'airbnb', name: 'Airbnb', group: 'stays', mark: 'A', accent: '#ff385c', description: 'Casas e apartamentos', badge: 'Destino + datas' },
-    { id: 'booking', name: 'Booking.com', group: 'stays', mark: 'B', accent: '#003b95', description: 'Hotéis e acomodações', badge: 'Destino + datas' },
-    { id: 'buser', name: 'Buser', group: 'ground', mark: 'BU', accent: '#e4007d', description: 'Viagens de ônibus', badge: 'Site oficial' },
-    { id: 'clickbus', name: 'ClickBus', group: 'ground', mark: 'CB', accent: '#00a650', description: 'Passagens rodoviárias', badge: 'Site oficial' },
-    { id: 'rome2rio', name: 'Rome2Rio', group: 'ground', mark: 'R2', accent: '#2f9da6', description: 'Compare rotas e modais', badge: 'Preenche rota' },
-  ]);
-
-  const TRAVEL_ALLOWED_HOSTS = new Set([
-    'www.google.com',
-    'www.kayak.com.br',
-    'www.skyscanner.com.br',
-    'www.decolar.com',
-    'www.voegol.com.br',
-    'passagens.voeazul.com.br',
-    'www.latamairlines.com',
-    'www.airbnb.com.br',
-    'www.booking.com',
-    'www.buser.com.br',
-    'www.clickbus.com.br',
-    'www.rome2rio.com',
-  ]);
+  const Travel = window.PlannerTravel;
+  const TRAVEL_PROVIDERS = Travel ? Travel.providers : Object.freeze([]);
 
   const $ = (selector, parent) => (parent || document).querySelector(selector);
   const $$ = (selector, parent) => [...(parent || document).querySelectorAll(selector)];
@@ -190,67 +170,8 @@
     status.classList.toggle('error', type === 'error');
   }
 
-  function cleanTravelLocation(value) {
-    return String(value == null ? '' : value)
-      .replace(/[\u0000-\u001f\u007f]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 80);
-  }
-
-  function iataCode(value) {
-    const source = cleanTravelLocation(value).toUpperCase();
-    const exact = source.match(/^[A-Z]{3}$/);
-    if (exact) return exact[0];
-    const parenthesized = source.match(/\(([A-Z]{3})\)\s*$/);
-    if (parenthesized) return parenthesized[1];
-    const trailing = source.match(/(?:^|[\s–—-])([A-Z]{3})\s*$/);
-    return trailing ? trailing[1] : null;
-  }
-
-  function validateTravelSearch(provider, input, referenceDate) {
-    const data = {
-      origin: cleanTravelLocation(input && input.origin),
-      destination: cleanTravelLocation(input && input.destination),
-      departure: String((input && input.departure) || ''),
-      returnDate: String((input && input.returnDate) || ''),
-      passengers: Number((input && input.passengers) || 1),
-    };
-    const requiresOrigin = provider.group !== 'stays';
-    const hasUsefulText = (value) => /[\p{L}\p{N}]/u.test(value);
-
-    if (!data.destination || !hasUsefulText(data.destination) || (requiresOrigin && (!data.origin || !hasUsefulText(data.origin)))) {
-      return {
-        ok: false,
-        title: 'Complete a busca',
-        message: requiresOrigin ? 'Informe origem e destino válidos antes de escolher o site.' : 'Informe um destino válido antes de buscar hospedagem.',
-        field: requiresOrigin && (!data.origin || !hasUsefulText(data.origin)) ? 'origin' : 'destination',
-      };
-    }
-    if ((data.departure && Core.date(data.departure) !== data.departure)
-      || (data.returnDate && Core.date(data.returnDate) !== data.returnDate)) {
-      return { ok: false, title: 'Datas inválidas', message: 'Informe datas válidas para continuar.', field: 'departure' };
-    }
-    if (data.returnDate && !data.departure) {
-      return { ok: false, title: 'Data de ida necessária', message: 'A volta só pode ser usada junto com a ida.', field: 'departure' };
-    }
-    if (data.departure && data.departure < referenceDate) {
-      return { ok: false, title: 'Data de ida inválida', message: 'Escolha hoje ou uma data futura.', field: 'departure' };
-    }
-    if (data.departure && data.returnDate && data.returnDate < data.departure) {
-      return { ok: false, title: 'Período inválido', message: 'Escolha uma volta igual ou posterior à ida.', field: 'return' };
-    }
-    if (provider.group === 'stays' && data.departure && data.returnDate && data.returnDate === data.departure) {
-      return { ok: false, title: 'Hospedagem sem diária', message: 'Para hospedagem, a saída deve ser posterior à entrada.', field: 'return' };
-    }
-    if (!Number.isInteger(data.passengers) || data.passengers < 1 || data.passengers > 9) {
-      return { ok: false, title: 'Quantidade inválida', message: 'Escolha entre 1 e 9 viajantes.', field: 'passengers' };
-    }
-    return { ok: true, data };
-  }
-
   function readTravelSearch(provider) {
-    const result = validateTravelSearch(provider, {
+    const result = Travel.validate(provider.id, {
       origin: $('#travel-search-origin')?.value,
       destination: $('#travel-search-destination')?.value,
       departure: $('#travel-search-departure')?.value,
@@ -272,18 +193,6 @@
     return null;
   }
 
-  function travelDateToken(value) {
-    return value ? value.replace(/-/g, '').slice(2) : '';
-  }
-
-  function travelPathSlug(value) {
-    return cleanTravelLocation(value)
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-  }
-
   function travelSummary(data) {
     const period = data.departure
       ? `${formatDate(data.departure)}${data.returnDate ? ` a ${formatDate(data.returnDate)}` : ' · somente ida'}`
@@ -292,76 +201,7 @@
   }
 
   function buildTravelProviderSearch(provider, data) {
-    let url;
-    let prefilled = false;
-    const originCode = iataCode(data.origin);
-    const destinationCode = iataCode(data.destination);
-
-    if (provider.id === 'google-flights') {
-      url = new URL('https://www.google.com/travel/flights');
-      const query = [`Voos de ${data.origin} para ${data.destination}`];
-      if (data.departure) query.push(`ida ${data.departure}`);
-      if (data.returnDate) query.push(`volta ${data.returnDate}`);
-      query.push(`${data.passengers} ${data.passengers === 1 ? 'adulto' : 'adultos'}`);
-      url.searchParams.set('q', query.join(' '));
-      url.searchParams.set('hl', 'pt-BR');
-      url.searchParams.set('curr', 'BRL');
-      prefilled = true;
-    } else if (provider.id === 'kayak') {
-      const canPrefill = originCode && destinationCode && data.departure;
-      url = canPrefill
-        ? new URL(`https://www.kayak.com.br/flights/${originCode}-${destinationCode}/${data.departure}${data.returnDate ? `/${data.returnDate}` : ''}/${data.passengers}adults`)
-        : new URL('https://www.kayak.com.br/flights');
-      if (canPrefill) url.searchParams.set('sort', 'bestflight_a');
-      prefilled = Boolean(canPrefill);
-    } else if (provider.id === 'skyscanner') {
-      const canPrefill = originCode && destinationCode && data.departure;
-      url = canPrefill
-        ? new URL(`https://www.skyscanner.com.br/transporte/passagens-aereas/${originCode.toLowerCase()}/${destinationCode.toLowerCase()}/${travelDateToken(data.departure)}${data.returnDate ? `/${travelDateToken(data.returnDate)}` : ''}/`)
-        : new URL('https://www.skyscanner.com.br/');
-      if (canPrefill) {
-        url.searchParams.set('adultsv2', String(data.passengers));
-        url.searchParams.set('cabinclass', 'economy');
-        url.searchParams.set('rtn', data.returnDate ? '1' : '0');
-      }
-      prefilled = Boolean(canPrefill);
-    } else if (provider.id === 'airbnb') {
-      url = new URL(`https://www.airbnb.com.br/s/${encodeURIComponent(data.destination)}/homes`);
-      if (data.departure) url.searchParams.set('checkin', data.departure);
-      if (data.returnDate) url.searchParams.set('checkout', data.returnDate);
-      url.searchParams.set('adults', String(data.passengers));
-      prefilled = true;
-    } else if (provider.id === 'booking') {
-      url = new URL('https://www.booking.com/searchresults.pt-br.html');
-      url.searchParams.set('ss', data.destination);
-      if (data.departure) url.searchParams.set('checkin', data.departure);
-      if (data.returnDate) url.searchParams.set('checkout', data.returnDate);
-      url.searchParams.set('group_adults', String(data.passengers));
-      url.searchParams.set('no_rooms', '1');
-      url.searchParams.set('group_children', '0');
-      prefilled = true;
-    } else if (provider.id === 'rome2rio') {
-      const originSlug = travelPathSlug(data.origin);
-      const destinationSlug = travelPathSlug(data.destination);
-      if (!originSlug || !destinationSlug) throw new Error('A rota não pode ser convertida para o Rome2Rio.');
-      url = new URL(`https://www.rome2rio.com/pt/map/${originSlug}/${destinationSlug}`);
-      prefilled = true;
-    } else {
-      const officialUrls = {
-        decolar: 'https://www.decolar.com/passagens-aereas/',
-        gol: 'https://www.voegol.com.br/br/voos',
-        azul: 'https://passagens.voeazul.com.br/pt/buscador-de-precos',
-        latam: 'https://www.latamairlines.com/br/pt',
-        buser: 'https://www.buser.com.br/',
-        clickbus: 'https://www.clickbus.com.br/',
-      };
-      url = new URL(officialUrls[provider.id]);
-    }
-
-    if (url.protocol !== 'https:' || url.username || url.password || url.port || !TRAVEL_ALLOWED_HOSTS.has(url.hostname.toLowerCase())) {
-      throw new Error('Destino de busca não autorizado.');
-    }
-    return { url: url.href, prefilled };
+    return Travel.build(provider.id, data, today());
   }
 
   async function openTravelProvider(providerId) {
@@ -401,9 +241,14 @@
         copied = true;
       } catch (_) {}
     }
-    const detail = search.prefilled
-      ? `${provider.name} aberto com os dados disponíveis.`
-      : `${provider.name} aberto na busca oficial.${copied ? ' O resumo foi copiado.' : ' Use os dados mantidos neste formulário.'}`;
+    const modeMessage = search.mode === 'exact'
+      ? `${provider.name} aberto com as datas inseridas na URL de busca.`
+      : search.mode === 'assisted'
+        ? `${provider.name} aberto com uma busca assistida. Confirme os campos exibidos.`
+        : `${provider.name} aberto na página oficial.${copied ? ' O resumo foi copiado.' : ' Preencha os campos no site.'}`;
+    const detail = search.warnings && search.warnings.length
+      ? `${modeMessage} ${search.warnings[0]}`
+      : modeMessage;
     setTravelSearchStatus(detail, 'success');
     toast('Busca aberta', detail, 'success');
   }
@@ -428,6 +273,59 @@
     if (!$('#travel-search-origin').value) window.setTimeout(() => $('#travel-search-origin')?.focus(), 350);
   }
 
+  function loginTarget() {
+    const allowedViews = new Set(['dashboard', 'finances', 'trips', 'goals', 'checklist', 'decisions', 'reports', 'settings']);
+    const view = location.hash.slice(1);
+    const next = allowedViews.has(view) ? `app.html#${view}` : 'app.html';
+    return `auth.html?next=${encodeURIComponent(next)}`;
+  }
+
+  function redirectToLogin() {
+    if (location && typeof location.replace === 'function') location.replace(loginTarget());
+    else location.href = loginTarget();
+  }
+
+  async function lockVault(options) {
+    if (state.locking) return;
+    state.locking = true;
+    try { state.unsubscribe?.(); } catch (_) {}
+    state.unsubscribe = null;
+    if (state.autoLockTimer) window.clearInterval(state.autoLockTimer);
+    state.autoLockTimer = null;
+    state.workspace = null;
+    state.account = null;
+    try {
+      await Repository.auth.lock({ allTabs: !options || options.allTabs !== false });
+    } catch (_) {
+      try { sessionStorage.setItem('plannerduo:auth-warning', 'Não foi possível confirmar o bloqueio das outras abas. Feche-as manualmente.'); } catch (_) {}
+    } finally {
+      redirectToLogin();
+    }
+  }
+
+  function setupAutoLock() {
+    const expired = () => Date.now() >= state.sessionExpiresAt
+      || Date.now() - state.lastActivityAt >= AUTO_LOCK_MS;
+    const enforceDeadline = () => {
+      if (!state.locking && expired()) {
+        lockVault({ allTabs: false });
+        return true;
+      }
+      return false;
+    };
+    const recordActivity = () => {
+      if (!enforceDeadline()) state.lastActivityAt = Date.now();
+    };
+    ['pointerdown', 'keydown', 'touchstart'].forEach((type) => {
+      window.addEventListener(type, recordActivity, { passive: true });
+    });
+    window.addEventListener('pageshow', enforceDeadline);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') enforceDeadline();
+    });
+    state.autoLockTimer = window.setInterval(enforceDeadline, 30000);
+  }
+
   function entityConflict(message) {
     const error = new Error(message || 'Este item foi alterado ou removido em outra aba.');
     error.code = 'local/entity-conflict';
@@ -435,21 +333,28 @@
   }
 
   async function commit(mutator, successMessage) {
+    if (state.locking) return false;
     const expectedGeneration = state.workspace.generation;
     try {
-      state.workspace = await Repository.update(mutator, expectedGeneration);
+      const updatedWorkspace = await Repository.update(mutator, expectedGeneration);
+      if (state.locking) return false;
+      state.workspace = updatedWorkspace;
       renderAll();
       if (successMessage) toast(successMessage, '', 'success');
       return true;
     } catch (error) {
       if (error && (error.code === 'local/workspace-replaced' || error.code === 'local/entity-conflict')) {
-        state.workspace = error.currentWorkspace || Repository.load();
+        state.workspace = error.currentWorkspace || await Repository.load();
         renderAll();
         toast(
           error.code === 'local/workspace-replaced' ? 'Workspace substituído em outra aba' : 'Item alterado em outra aba',
           error.message || 'Sua alteração não foi aplicada. Revise o estado atual.',
           'error'
         );
+        return false;
+      }
+      if (error && ['vault/locked', 'vault/session-invalid', 'vault/invalid-credentials'].includes(error.code)) {
+        await lockVault({ allTabs: false });
         return false;
       }
       toast('Não foi possível salvar', error && error.message ? error.message : 'Tente novamente.', 'error');
@@ -495,6 +400,12 @@
 
   function renderWorkspaceIdentity() {
     const workspaceName = state.workspace.name || 'Workspace local';
+    const accountName = state.account?.name || 'Conta local';
+    setText('#sidebar-account-name', accountName);
+    setText('#sidebar-account-email', state.account?.email || 'Cofre desbloqueado');
+    setText('#sidebar-account-avatar', initials(accountName));
+    setText('#security-account-name', accountName);
+    setText('#security-account-email', state.account?.email || '');
     setText('#sidebar-workspace-name', workspaceName);
     setText('#dashboard-greeting', state.workspace.name ? `${state.workspace.name}, em um só lugar.` : 'Planeje do seu jeito.');
     setText('#dashboard-subtitle', activeParticipants().length
@@ -694,7 +605,8 @@
 
   function renderTravelProviders() {
     const container = $('#travel-provider-grid');
-    if (!container) return;
+    if (!container || !Travel) return;
+    setText('#travel-provider-count', `${TRAVEL_PROVIDERS.length} provedores`);
     $$('[data-travel-provider-filter]').forEach((button) => {
       const active = button.dataset.travelProviderFilter === state.travelProviderFilter;
       button.classList.toggle('active', active);
@@ -705,8 +617,8 @@
     ));
     container.innerHTML = providers.map((provider) => `
       <button class="travel-provider-card" style="--provider-accent:${provider.accent}" type="button" data-action="search-provider" data-provider="${escapeHtml(provider.id)}" aria-label="Pesquisar no ${escapeHtml(provider.name)}">
-        <span class="travel-provider-logo" aria-hidden="true">${escapeHtml(provider.mark)}</span>
-        <span class="travel-provider-copy"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.description)}</small><span class="travel-provider-tag">${escapeHtml(provider.badge)}</span></span>
+        <span class="travel-provider-logo" aria-hidden="true">${Travel.iconSvg(provider.id)}</span>
+        <span class="travel-provider-copy"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.description)}</small><span class="travel-provider-tag ${provider.support}">${escapeHtml(Travel.badgeFor(provider))}</span></span>
         <span class="travel-provider-arrow" aria-hidden="true">↗</span>
       </button>`).join('');
   }
@@ -836,6 +748,9 @@
   }
 
   function renderSettings() {
+    const vaultStatus = Repository.auth.status();
+    const legacyConflict = $('#legacy-conflict');
+    if (legacyConflict) legacyConflict.hidden = !vaultStatus.hasLegacyWorkspace;
     const nameInput = $('#workspace-name-input');
     if (nameInput && document.activeElement !== nameInput) nameInput.value = state.workspace.name;
     const container = $('#participant-settings-list');
@@ -1061,9 +976,14 @@
     toast('CSV gerado', `${rows.length} ${rows.length === 1 ? 'lançamento exportado' : 'lançamentos exportados'}.`, 'success');
   }
 
-  function exportBackup() {
-    download(`plannerduo-backup-${today()}.json`, Repository.exportJson(state.workspace), 'application/json');
-    toast('Backup concluído', 'Guarde o arquivo em um local seguro.', 'success');
+  async function exportBackup() {
+    try {
+      const encrypted = await Repository.exportEncrypted();
+      download(`plannerduo-cofre-${today()}.json`, encrypted, 'application/json');
+      toast('Backup criptografado concluído', 'O arquivo continua protegido pela senha do cofre.', 'success');
+    } catch (error) {
+      toast('Falha no backup', error.message || 'Não foi possível exportar o cofre.', 'error');
+    }
   }
 
   function applyChecklistTemplate() {
@@ -1093,6 +1013,11 @@
     if (action === 'open-sidebar') return openSidebar();
     if (action === 'close-sidebar') return closeSidebar();
     if (action === 'toggle-theme') return toggleTheme();
+    if (action === 'lock-vault') return lockVault({ allTabs: true });
+    if (action === 'open-security') {
+      $('#security-form')?.reset();
+      return showDialog($('#security-dialog'));
+    }
     if (action === 'search-provider') return openTravelProvider(element.dataset.provider);
     if (action === 'search-trip') return fillTravelSearchFromTrip(id);
     if (action === 'open-setup') {
@@ -1112,6 +1037,22 @@
     }
     if (action === 'export-csv') return exportCsv(element);
     if (action === 'export-backup') return exportBackup();
+    if (action === 'export-legacy-conflict') {
+      try {
+        download(`plannerduo-conflito-legado-${today()}.json`, Repository.auth.exportRawLegacy(), 'application/json');
+        toast('Cópia legível baixada', 'Revise o arquivo antes de descartá-lo.', 'success');
+      } catch (error) {
+        toast('Cópia não encontrada', error.message, 'error');
+      }
+      return;
+    }
+    if (action === 'discard-legacy-conflict') {
+      if (!confirm('Descartar definitivamente a cópia legível conflitante? O cofre criptografado será mantido.')) return;
+      await Repository.auth.discardLegacyConflict();
+      renderSettings();
+      toast('Cópia legível descartada', 'Somente o cofre criptografado permanece.', 'success');
+      return;
+    }
     if (action === 'choose-import') return $('#backup-file-input')?.click();
     if (action === 'apply-checklist-template') return applyChecklistTemplate();
     if (action === 'clear-completed-checklist') {
@@ -1236,6 +1177,53 @@
   }
 
   function bindForms() {
+    $('#security-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const currentPassword = $('#security-current-password').value;
+      const newPassword = $('#security-new-password').value;
+      const confirmation = $('#security-confirm-password').value;
+      if (newPassword !== confirmation) {
+        toast('Senhas diferentes', 'A confirmação precisa ser idêntica à nova senha.', 'error');
+        return;
+      }
+      const button = event.currentTarget.querySelector('[type="submit"]');
+      button.disabled = true;
+      try {
+        const result = await Repository.auth.changePassword({ currentPassword, newPassword });
+        state.account = result.account;
+        state.workspace = result.workspace;
+        state.sessionExpiresAt = result.expiresAt || state.sessionExpiresAt;
+        event.currentTarget.reset();
+        closeDialog($('#security-dialog'));
+        renderAll();
+        toast('Senha alterada', 'As outras abas foram bloqueadas e o cofre foi recriptografado.', 'success');
+      } catch (error) {
+        toast('Não foi possível alterar a senha', error.message || 'Revise a senha atual e a nova senha.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    $('#backup-password-form')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!state.pendingBackupSource) return closeDialog($('#backup-password-dialog'));
+      const button = event.currentTarget.querySelector('[type="submit"]');
+      button.disabled = true;
+      try {
+        state.workspace = await Repository.importBackup(state.pendingBackupSource, $('#backup-password').value);
+        state.pendingBackupSource = null;
+        state.voterByDecision = {};
+        event.currentTarget.reset();
+        closeDialog($('#backup-password-dialog'));
+        renderAll();
+        toast('Backup restaurado', 'O conteúdo foi recriptografado com a conta atual.', 'success');
+      } catch (error) {
+        toast('Não foi possível abrir o backup', error.message || 'Senha ou arquivo inválido.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
     $('#travel-search-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       await openTravelProvider('google-flights');
@@ -1544,11 +1532,22 @@
       if (!file) return;
       try {
         const source = await file.text();
-        if (!confirm('Importar este backup? O workspace atual será substituído.')) return;
-        state.workspace = await Repository.importJson(source);
+        if (!confirm('Importar este backup? O workspace atual será substituído dentro do cofre.')) return;
+        try {
+          state.workspace = await Repository.importBackup(source);
+        } catch (error) {
+          if (error && error.code === 'vault/backup-password-required') {
+            state.pendingBackupSource = source;
+            $('#backup-password-form')?.reset();
+            showDialog($('#backup-password-dialog'));
+            toast('Senha do backup necessária', 'Informe a senha usada quando esse arquivo foi criado.');
+            return;
+          }
+          throw error;
+        }
         state.voterByDecision = {};
         renderAll();
-        toast('Backup restaurado', 'Todos os dados compatíveis foram importados.', 'success');
+        toast('Backup restaurado', 'Os dados foram validados e recriptografados com a conta atual.', 'success');
       } catch (error) {
         toast('Falha ao importar', error.message || 'Arquivo inválido.', 'error');
       } finally {
@@ -1576,7 +1575,7 @@
         workspace.generation
       );
     } catch (error) {
-      if (error && error.code === 'local/workspace-replaced') return error.currentWorkspace || Repository.load();
+      if (error && error.code === 'local/workspace-replaced') return error.currentWorkspace || await Repository.load();
       throw error;
     }
   }
@@ -1589,11 +1588,18 @@
   }
 
   async function init() {
-    if (!Core || !Repository) {
+    if (!Core || !Repository || !Repository.auth || !Travel) {
       showFatal(new Error('Os módulos locais obrigatórios não foram carregados.'));
       return;
     }
     try {
+      const restoredSession = await Repository.auth.restoreSession();
+      if (!restoredSession) {
+        redirectToLogin();
+        return;
+      }
+      state.account = restoredSession.account;
+      state.sessionExpiresAt = restoredSession.expiresAt || 0;
       let theme = 'light';
       try {
         theme = localStorage.getItem(Repository.THEME_KEY)
@@ -1605,11 +1611,17 @@
       bindEvents();
       renderAll();
       state.unsubscribe = Repository.subscribe((workspace) => {
-        if (workspace.revision <= state.workspace.revision) return;
+        if (!state.workspace || workspace.revision <= state.workspace.revision) return;
         state.workspace = workspace;
         renderAll();
         toast('Dados atualizados', 'Outra aba alterou este workspace.');
+      }, () => {
+        lockVault({ allTabs: false });
+      }, () => {
+        renderSettings();
+        toast('Cópia legível detectada', 'Uma aba antiga gravou dados fora do cofre. Baixe e revise a cópia em Configurações.', 'error');
       });
+      setupAutoLock();
       const shell = $('#app-shell');
       const loader = $('#app-loading');
       if (shell) shell.hidden = false;
@@ -1635,8 +1647,15 @@
           showDialog($('#setup-dialog'));
         }, 280);
       }
-      window.addEventListener('beforeunload', () => state.unsubscribe?.(), { once: true });
+      window.addEventListener('beforeunload', () => {
+        state.unsubscribe?.();
+        if (state.autoLockTimer) window.clearInterval(state.autoLockTimer);
+      }, { once: true });
     } catch (error) {
+      if (error && ['vault/locked', 'vault/session-invalid', 'vault/invalid-credentials'].includes(error.code)) {
+        redirectToLogin();
+        return;
+      }
       showFatal(error);
     }
   }
@@ -1645,19 +1664,7 @@
     getState: () => Core.clone(state.workspace),
     navigate,
     render: renderAll,
-    travelSearch: Object.freeze({
-      providerIds: Object.freeze(TRAVEL_PROVIDERS.map((provider) => provider.id)),
-      validate(providerId, input, referenceDate) {
-        const provider = TRAVEL_PROVIDERS.find((item) => item.id === providerId);
-        if (!provider) return { ok: false, title: 'Provedor inválido', message: 'O site escolhido não existe.' };
-        return validateTravelSearch(provider, input, referenceDate || today());
-      },
-      build(providerId, data) {
-        const provider = TRAVEL_PROVIDERS.find((item) => item.id === providerId);
-        if (!provider) throw new Error('Provedor inválido.');
-        return buildTravelProviderSearch(provider, data);
-      },
-    }),
+    travelSearch: Travel,
   });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

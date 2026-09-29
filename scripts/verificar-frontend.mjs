@@ -11,7 +11,7 @@ const portArgument = process.argv.indexOf('--port');
 const PORT = Number(portArgument !== -1 ? process.argv[portArgument + 1] : 5177);
 const BASE = `http://localhost:${PORT}`;
 const PAGES = ['index.html', 'app.html', 'auth.html'];
-const SCRIPTS = ['core.js', 'local.js', 'app.js'];
+const SCRIPTS = ['core.js', 'local.js', 'travel.js', 'auth.js', 'app.js'];
 const failures = [];
 const successes = [];
 
@@ -41,7 +41,7 @@ for (const page of PAGES) {
       check(false, `recurso local em ${page}`, `URL externa: ${url}`);
       continue;
     }
-    references.add(url.split('#')[0]);
+    references.add(url.split(/[?#]/)[0]);
   }
 }
 for (const script of SCRIPTS) publicSource += `\n${await readFile(join(PUBLIC, script), 'utf8')}`;
@@ -64,11 +64,16 @@ const forbiddenRuntimePatterns = [
 for (const [name, pattern] of forbiddenRuntimePatterns) {
   check(!pattern.test(publicSource), `ausência de ${name} no runtime`);
 }
-check(/plannerduo:workspace:v1/.test(publicSource), 'schema local versionado presente');
+check(/plannerduo:vault:v1/.test(publicSource), 'cofre local versionado presente');
+check(/PBKDF2/.test(publicSource) && /SHA-256/.test(publicSource), 'derivação forte de senha presente');
+check(/AES-GCM/.test(publicSource), 'criptografia autenticada presente');
+check(/id="unlock-form"/.test(publicSource) && /type="password"/.test(publicSource), 'tela de login presente');
+check(/Repository\.auth\.restoreSession/.test(publicSource), 'guarda de sessão do painel presente');
 check(/data-view-panel="decisions"/.test(publicSource), 'módulo de decisões presente');
 check(/data-view-panel="settings"/.test(publicSource), 'gestão de participantes presente');
 check(/id="travel-search-form"/.test(publicSource), 'motor de busca de viagens presente');
-check(/TRAVEL_ALLOWED_HOSTS\.has/.test(publicSource), 'allowlist de provedores de viagem presente');
+check(/allowedHosts\.has/.test(publicSource), 'allowlist de provedores de viagem presente');
+check(/providerIds/.test(publicSource) && /iconSvg/.test(publicSource), 'registry e ícones locais de viagem presentes');
 check(/noopener noreferrer/.test(publicSource), 'navegação externa isolada do aplicativo');
 check(/script-src 'self'/.test(publicSource), 'CSP restringe scripts a assets locais');
 check(/connect-src 'none'/.test(publicSource), 'CSP bloqueia conexões de dados em segundo plano');
@@ -110,6 +115,8 @@ try {
     '/style.css': ['style.css', 'text/css'],
     '/core.js': ['core.js', 'text/javascript'],
     '/local.js': ['local.js', 'text/javascript'],
+    '/travel.js': ['travel.js', 'text/javascript'],
+    '/auth.js': ['auth.js', 'text/javascript'],
     '/app.js': ['app.js', 'text/javascript'],
   };
   for (const [route, [filename, contentType]] of Object.entries(expected)) {
@@ -120,6 +127,10 @@ try {
       check(response.status === 200, `HTTP 200 em ${route}`, `status ${response.status}`);
       check((response.headers.get('content-type') || '').includes(contentType), `Content-Type de ${route}`);
       check(body === disk, `conteúdo íntegro em ${route}`);
+      if (route === '/auth') {
+        check(response.headers.get('x-frame-options') === 'DENY', 'login não pode ser enquadrado');
+        check((response.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"), 'CSP HTTP bloqueia frame ancestors');
+      }
     } catch (error) {
       check(false, `smoke HTTP em ${route}`, error.message);
     }
