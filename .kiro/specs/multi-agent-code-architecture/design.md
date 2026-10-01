@@ -3,9 +3,9 @@
 **Feature:** `multi-agent-code-architecture`
 **Workflow:** Design-first
 **Detail level:** High-Level Design + Low-Level Design
-**Status:** Revisado — plataforma avançada de operações de viagem e finanças da viagem, com referência conceitual na Blis.AI; sem implementação nesta fase
+**Status:** Revisado — plataforma avançada de operações de viagem e finanças da viagem, com referência conceitual na Blis.AI; sem implementação nesta fase. Adendo de 29/09/2026: orquestrador autônomo e runtime de skills (7.12), Agente de Viagens com busca de mercado (7.13), identidade visual minimalista e futurista (7.14), ícones enxutos (7.8.11), decisões 31–34, Property 6 e testes 14.13, em 4 etapas sequenciais
 **Notation:** pseudocódigo estruturado, independente de linguagem
-**Rastreabilidade:** `requirements.md` ainda reflete a revisão anterior (8 agentes, 11 skills, schema v1 e `connect-src 'none'`); ele será atualizado e `tasks.md` será derivado nas próximas fases a partir deste design.
+**Rastreabilidade:** `requirements.md` rastreia as Properties 1–5 (Requirements 1–5). O adendo de 29/09/2026 acrescenta a Property 6, cujos critérios 6.1–6.17 são planejados e serão criados na próxima atualização de `requirements.md`; `tasks.md` será derivado depois, a partir deste design.
 
 ## Overview
 
@@ -58,7 +58,8 @@ A revisão também transforma legibilidade e recuperação do acesso em contrato
 - Transformar o PlannerDuo em agência, TMC, consolidadora, emissor de bilhetes, processador de pagamento ou agregador com scraping.
 - Integrar GDS, NDC, OBT ou APIs de reserva/emissão de companhias, hotéis e locadoras; reservar, emitir, remarcar e reemitir continuam sendo ações do usuário no site do provedor.
 - Integrar oficialmente WhatsApp, e-mail ou outro canal de mensagens; no máximo o usuário copia ou exporta localmente um resumo em texto.
-- Alegar preço em tempo real, disponibilidade, regra tarifária oficial, custo de remarcação garantido ou reserva confirmada pelo sistema; regras e confirmações são sempre informadas pelo usuário.
+- Reservar, emitir, pagar ou criar pedidos em qualquer API; a busca de ofertas via APIs Duffel (voos) e LiteAPI (hospedagem), pelo servidor local em loopback (7.13), é permitida, e a compra acontece sempre no site do provedor. Continua fora alegar regra tarifária oficial, custo de remarcação garantido, disponibilidade garantida após a consulta ou reserva confirmada pelo sistema; regras e confirmações seguem informadas pelo usuário.
+- Executar a migração para o schema v2 (8.5) no escopo de implementação de 29/09/2026: ela fica adiada, e as skills de 7.12 operam sobre o schema v1, sem migração; capacidades que dependem da v2 (cotações, reservas e pós-venda persistidos, multimoeda e `settings.assistant`) continuam planejadas.
 - Alterar o formato `plannerduo-vault`, a estrutura do envelope, os parâmetros criptográficos ou `MAX_AMOUNT`; a única evolução persistida permitida é a migração versionada do workspace v1 → v2 (8.5).
 - Excluir registros financeiros legados sem viagem ou inventar vínculo automaticamente.
 - Persistir entidades fora da migração v2 ou apresentar uma reserva `CONFIRMED_BY_USER` como verificada pelo sistema.
@@ -127,6 +128,10 @@ A revisão também transforma legibilidade e recuperação do acesso em contrato
 28. **Exact money.** Valores são inteiros em unidades menores ISO 4217; câmbio é manual, datado e congelado no lançamento; IOF e taxas são regras do usuário, sem alíquota no código; o arredondamento é único (`HALF_EVEN`) e documentado.
 29. **Local design system.** Tokens, temas, componentes e ícones são assets locais; não há fonte, CDN ou biblioteca de UI externa; legibilidade, contraste e movimento reduzido são contratos testáveis.
 30. **Product assistants are not Kiro agents.** Os “agentes temáticos” do assistente (Cotações, Remarcação, Hospedagem, Financeiro, Roteiro) são presets de runtime com escopo de contexto e ferramentas; não se confundem com os agentes de engenharia do Kiro da seção 7.2.
+31. **Local-first intent orchestration.** Um orquestrador local e determinístico (7.12) interpreta mensagens e aciona skills de forma invisível; o LLM é só fallback opcional para mensagens de baixa confiança com IA habilitada, devolve apenas intenção e slots validados por schema, nunca executa skills nem recebe dados do workspace, e o app funciona integralmente sem ele.
+32. **Graduated autonomy.** Leituras executam automaticamente; escritas de comando explícito interpretado localmente executam com recibo e “Desfazer”; escritas vindas de interpretação remota exigem card de confirmação (decisão 26); skills destrutivas ou sensíveis só existem na UI; navegação externa só por clique (7.12.7).
+33. **Market search through the local proxy.** Amplia a exceção de rede da decisão 24: o mesmo servidor local em loopback, e somente ele, consulta `api.duffel.com` e `api.liteapi.travel` para busca de ofertas, com chaves confinadas como na decisão 25; reserva, emissão, pagamento e pedidos continuam fora (decisão 23), e a Amadeus fica fora porque o Self-Service foi desativado (7.13.1).
+34. **Minimal-futurist visual identity.** A identidade de 7.14 (tema escuro padrão, glass sutil, contrastes luminosos e pilha tipográfica do sistema) prevalece sobre os valores de 7.9.4 e mantém os contratos das decisões 3 e 29 e de 7.6.
 
 ## Architecture
 
@@ -1327,6 +1332,16 @@ O baseline atual usa `short` e `accent` para construir letras/monogramas e SVGs 
 
 Rollback posterior ao cutover restaura somente o último conjunto completo de manifesto/assets que já tenha passado pelos mesmos gates. Se não houver conjunto oficial anterior, o rollback desabilita comparação/navegação de provedores com mensagem segura e preserva viagens; ele nunca reativa SVG, letra, monograma, emoji, template ou marca fabricada. Manifesto, assets e renderer são revertidos como uma unidade, enquanto schema do workspace, envelope e Fachadas_Públicas permanecem inalterados.
 
+### 7.8.11 Aquisição enxuta de ícones (escopo 2026-09-29)
+
+Nesta execução vale uma versão enxuta deste pipeline. `scripts/fetch-provider-icons.mjs` roda só por comando explícito de desenvolvimento, nunca no bootstrap ou no runtime, e obtém para cada um dos 26 `providerId` o ícone real do host oficial (hostname da URL de `PlannerTravel.build`, sempre em `allowedHosts`), com um arquivo por `providerId` mesmo quando o host se repete (Expedia):
+
+1. fonte: home oficial por HTTPS, com no máximo 3 redirects e somente no mesmo host, usando o `apple-touch-icon`, depois o maior ícone declarado em `<link rel="icon">` e depois `/favicon.ico`; só se tudo falhar, o serviço de favicons do Google para o mesmo host (`https://www.google.com/s2/favicons?domain=<host>&sz=128`);
+2. validação: tipo real por assinatura (PNG, WebP, JPEG, ICO ou SVG passivo conforme 7.8.7), de 1 byte a 256 KiB e de 16 a 512 px;
+3. saída: `public/assets/providers/<providerId>.<ext>` e `public/assets/providers/manifest.json` com `providerId`, `host`, `source` (`APPLE_TOUCH_ICON`, `DECLARED_ICON`, `FAVICON` ou `GOOGLE_FAVICONS`), `sourceUrl`, `fetchedAt`, `mediaType`, `bytes` e `sha256`.
+
+O runtime usa somente esses arquivos locais (`img-src 'self' data:`), e os testes conferem o SHA-256 dos bytes servidos. Os tiles deixam de usar `iconSvg`/`badgeFor` (`short`/`accent`), e ícone ausente ou inválido mostra só o nome textual, nunca letra ou monograma (decisão 20). Ficam adiados para a release completa as três evidências por entry, licença e diretrizes, a prioridade de kit de marca, o Simple Icons, o `providers.manifest.json` de 7.8.5 e a aprovação independente de Segurança e documentação/release (decisão 21).
+
 ## 7.9 Advanced Front-end Inspired by Blis.AI
 
 O front avançado transforma a jornada de viagem em uma mesa de operações pessoal. A tabela registra a adaptação conceitual; nenhum item copia elemento visual ou textual da Blis.AI.
@@ -1767,6 +1782,301 @@ END INTERFACE
 ```
 
 `SettlementService` reutiliza o algoritmo de `PlannerCore.calculateSettlements` sobre `totalBaseMinor`, preservando a conservação em unidades menores da referência. `ReportService.summaryText` gera texto local para copiar ou baixar; é a única ponte com WhatsApp e e-mail, e quem cola o texto é o usuário.
+
+## 7.12 Orquestrador autônomo e runtime de skills (escopo de implementação 2026-09-29)
+
+### 7.12.1 Escopo e precedência
+
+A diretiva de 29/09/2026 transforma o PlannerDuo em uma plataforma de agentes autônomos orientados a skills, com orquestração inteligente e UI minimalista e futurista, mantendo a Blis.AI como referência apenas conceitual (decisão 22). A execução tem quatro etapas estritamente sequenciais, cada uma iniciada só após o gate da anterior (14.13): (1) orquestrador e runtime de skills (7.12); (2) Agente de Viagens com busca de mercado (7.13); (3) refatoração visual e caça a bugs visuais (7.14 e 7.8.11); (4) integração final, estresse e zero falhas (Property 6). Onde o texto anterior diverge, vale este adendo dentro do escopo:
+
+| Trecho anterior | Regra neste escopo |
+|---|---|
+| Overview, 2.2 e decisão 24 (só o assistente acessa a internet, pelo proxy local); seções 3 e 7.1 (servidor com rota única); 7.10.1–7.10.3 (`/api/assistant`, `X-PlannerDuo-Assistant`, `PLANNERDUO_AI_ADAPTER`) | 7.13.2: quatro rotas `POST`, `X-PlannerDuo: 1` e `PLANNERDUO_AI_PROVIDER`; o mesmo processo em loopback consulta Duffel e LiteAPI (decisão 33); `connect-src 'self'` continua só em `app.html` |
+| 2.2 (preço em tempo real) e 22 (item deferido de preço/availability) | Busca de ofertas permitida; reserva, emissão, pagamento e pedidos continuam fora |
+| Seções 5.2 e 7.1 (`assistant-client.js` como único `fetch`), 14.11–14.12 e Properties 2.38, 2.45, 5.1 (rede com IA desligada) e 5.2 | Property 6.13 e 14.13: único `fetch` em `market-client.js`, para quatro paths same-origin, após mensagem ou ação do usuário, salvo um `POST /api/status` ao abrir a Central |
+| 7.10.5 e 8.5 (`settings.assistant` persistido) | Schema v2 adiado: o consentimento da IA fica só na memória da sessão e é renovado a cada desbloqueio |
+| 7.7 e 7.9.1 (Painel como tela inicial) e 7.9.4 (valores dos tokens) | 7.14: Central como tela inicial e tokens próprios |
+| 7.8.2–7.8.10 (admissão completa de marcas) | 7.8.11: aquisição enxuta; os gates completos continuam alvo de release |
+
+### 7.12.2 Agentes de runtime
+
+| Agente | Responsabilidade | Presets de 7.9.1 absorvidos |
+|---|---|---|
+| `orchestrator` (Orquestrador) | Interpreta, planeja, executa e compõe a resposta; ajuda e “Desfazer” | — |
+| `travel` (Agente de Viagens) | Viagens, voos, hospedagens e links dos 26 provedores | Cotações, Hospedagem e trechos do Roteiro |
+| `finance` (Agente Financeiro) | Transações, recorrência, orçamentos, metas, acertos e relatórios | Financeiro |
+| `planner` (Agente de Planejamento) | Checklist, decisões e votos, participantes e workspace | Checklist do Roteiro |
+
+São agentes de runtime do produto, registrados só no `PlannerSkills`, e não se confundem com a equipe Kiro de 7.2: o `orchestrator` de runtime não é o despachante de 5.1 (decisão 30). O preset Remarcação depende do schema v2 e fica fora deste escopo.
+
+```mermaid
+flowchart LR
+    U["Central: mensagem"] --> O[PlannerOrchestrator]
+    O --> N["PlannerNLU + PlannerPlaces"]
+    O --> R["PlannerSkills: validação, fila de 4, timeout, dedupe, cache e breaker"]
+    FORM["Formulários de app.js"] --> R
+    R --> T[travel-skills] & F[finance-skills] & P[planner-skills]
+    T & F & P --> C["PlannerCore + commit existente"]
+    T --> M["market-client.js: único fetch"]
+    R -->|"assist.interpret: baixa confiança e IA habilitada"| M
+    M --> S["Servidor loopback: guarda e adapters"]
+    S --> D[(Duffel)] & L[(LiteAPI)] & AI[(LLM opcional)]
+    R -.->|"skill:start, done, error"| A["Faixa de atividade"]
+```
+
+### 7.12.3 Módulos e interfaces
+
+```text
+public/modules/
+  agents/places.js         # PlannerPlaces: cidades brasileiras e destinos internacionais, aliases sem acento, IATA, ISO-2 e coordenadas
+  agents/nlu.js            # PlannerNLU: normalização, intents em allowlist, entidades e follow-ups
+  agents/ranking.js        # PlannerRanking: política estrita e score (7.13.4), puro
+  agents/skill-runtime.js  # PlannerSkills: registry, validação, fila, timeout, dedupe, cache, breaker e retry
+  agents/market-client.js  # PlannerMarketClient: único fetch do navegador (7.13.2)
+  agents/orchestrator.js   # PlannerOrchestrator: turnos, plano, eventos e blocos tipados
+  skills/travel-skills.js, finance-skills.js, planner-skills.js   # register(runtime) por agente
+  ui/central-view.js       # blocos renderizados com builders DOM seguros, sem innerHTML
+```
+
+Todos seguem o UMD de `core.js` (`module.exports` e global), são testáveis no Vitest e carregam por `<script>` em `app.html` depois das fachadas atuais, na ordem acima; `app.js` compõe o runtime com o `commit` existente.
+
+```pascal
+INTERFACE SkillRuntime                      // PlannerSkills.createRuntime({ core, commit, travel, market, clock })
+  METHOD define(definition: SkillDefinition) RETURNS Void            // valida e congela; id duplicado lança
+  METHOD invoke(id, input, opts: { source: CHAT OR UI, signal, turnId }) RETURNS Promise<Output>
+  METHOD on(event: skill:start OR skill:done OR skill:error, handler) RETURNS Unsubscribe
+  METHOD reset() RETURNS Void                                         // fila, cache e breakers; ao bloquear/sair
+END INTERFACE
+
+STRUCTURE SkillDefinition
+  id: SkillId                               // ^[a-z]+(\.[a-z-]+)+$, único
+  agent: orchestrator OR travel OR finance OR planner
+  kind: read OR write;  exposure: NonEmptySet<chat OR ui>;  timeoutMs: 100..30000
+  cache: Optional<{ ttlMs, maxEntries }>    // somente read
+  validate(input) RETURNS { ok: true, value } OR { ok: false, fields: List<FieldError> }
+  run(value, ctx: { signal, now, core, commit, travel, market }) RETURNS Promise<Output>
+END STRUCTURE
+
+STRUCTURE ParsedMessage                     // PlannerNLU.parse(text, context, clock): total, nunca lança
+  intent: AllowlistedIntent OR unknown;  confidence: Real em [0, 1];  followUp: Boolean;  missing: OrderedList<SlotName>
+  slots: { origin, destination: Place; departDate, returnDate: IsoDate; nights: 1..30; adults: 1..9;
+           childrenAges: List<0..17>; cabin; directOnly; maxPriceMinor; amountMinor; financeType; category; tripRef;
+           description }                  // texto livre extraído do original, sem normalização
+END STRUCTURE
+
+STRUCTURE ResponseBlock                     // PlannerOrchestrator: handle(text), act(blockId, action, gesture), clear()
+  id; turnId; agent: RuntimeAgentId
+  type: text OR question OR flights OR stays OR links OR summary OR receipt OR confirmation OR error
+  payload: TypedPayload                     // dados, nunca HTML; renderizados com textContent
+END STRUCTURE
+```
+
+- Intents em allowlist: `travel.search`, `travel.flights`, `travel.stays`, `travel.links`, `trip.create`, `trip.list`, `finance.add`, `finance.summary`, `finance.settle`, `budget.set`, `goal.create`, `goal.progress`, `checklist.add`, `checklist.list`, `decision.create`, `decision.vote`, `report.month`, `help`, `undo` e `unknown`.
+- `normalize` (NFD sem diacríticos, minúsculas, espaços e pontuação canônicos, até 1.000 caracteres) é idempotente. Datas absolutas (“12/11”, “12 de novembro”) e relativas (“amanhã”, “próxima sexta”, “daqui a 2 semanas”) usam o relógio injetado e o fuso do dispositivo; em viagens, dia/mês já passado vai para o ano seguinte; “de 10 a 15/11”, “volta dia 20” e “por 5 noites” definem o intervalo; mês sem dia vira pergunta. `PlannerPlaces.resolve` devolve `match`, `ambiguous` (pergunta com chips) ou `none`; “eu e minha esposa” conta 2 adultos, e criança entra com a idade.
+- Erros do runtime: `skill/not-found`, `skill/invalid-input`, `skill/timeout`, `skill/aborted`, `skill/circuit-open` e `skill/failed`, com `skillId`, `retryable` e `fields`; a copy vem de tabela fixa pt-BR, sem causa bruta.
+
+### 7.12.4 Invocação de skills
+
+```pascal
+PROCEDURE Invoke(id, input, opts)
+  def ← registry[id]
+  IF def IS NULL OR opts.source NOT IN def.exposure THEN RAISE skill/not-found     // skill de UI é invisível ao chat
+  v ← def.validate(input);  IF NOT v.ok THEN RAISE skill/invalid-input(v.fields)
+  key ← id + ":" + CanonicalJson(v.value)
+  IF def.kind = read AND cache.fresh(key) THEN RETURN cache.get(key)                // TTL + LRU, só em memória
+  IF def.kind = read AND inflight.has(key) THEN RETURN inflight.join(key, opts.signal)   // dedupe
+  FOR attempt ← 1 TO 2 DO
+    IF breaker.isOpen(id) THEN RAISE skill/circuit-open             // 3 falhas seguidas → 30 s aberto; depois 1 prova
+    signal ← AnySignal(opts.signal, TimeoutSignal(def.timeoutMs))   // AbortSignal.any ou composição manual
+    outcome ← limiter.run(def.kind, () ⇒ def.run(v.value, Context(signal)))   // ≤ 4 em execução
+    IF outcome.ok THEN breaker.success(id);  CacheIfRead(def, key, outcome.value);  RETURN outcome.value END IF
+    IF outcome.code IN { skill/aborted, skill/invalid-input } THEN RAISE outcome.error   // fora do breaker
+    breaker.failure(id)
+    IF NOT (def.kind = read AND outcome.retryable AND attempt = 1) THEN RAISE outcome.error   // timeout ou failed
+    WAIT Backoff(300 ms + jitter injetado, opts.signal)
+  END FOR
+END PROCEDURE
+```
+
+Invariantes: no máximo 4 execuções simultâneas, com escrita à frente na fila FIFO; no máximo 2 tentativas, a segunda só em leitura com erro `retryable`; toda leitura nova registra uma execução compartilhada em `inflight`, abortada só quando todos os interessados abortam; `skill/aborted` e `skill/invalid-input` não contam no breaker; escritas nunca são deduplicadas nem cacheadas; fila, cache e breakers vivem só em memória.
+
+### 7.12.5 Turno do orquestrador
+
+```pascal
+PROCEDURE HandleTurn(text)
+  current.abort();  turn ← NewTurn();  t ← Truncate(text, 1000)  // supersessão do turno anterior
+  parsed ← PlannerNLU.parse(t, memory, clock)
+  IF parsed.confidence < 0.45 AND AiEnabled() THEN                  // no máximo 1 chamada remota por turno
+    remote ← runtime.invoke("assist.interpret", { text: t, pending: parsed.missing }, { source: CHAT, signal: turn.signal })
+    IF ValidInterpretation(remote) THEN parsed ← Merge(parsed, remote, origin = REMOTE) END IF
+  END IF
+  plan ← BuildPlan(parsed, memory, AutonomyPolicy)                  // puro; escrita sem autonomia vira confirmation
+  IF plan.missing ≠ ∅ THEN EMIT question(plan.missing[0], Chips(plan.missing[0]));  RETURN END IF
+  FOR each stage IN plan.stages DO                                  // ex.: [voos ‖ hospedagem ‖ links] → resumo
+    FOR each settled IN AsCompleted(stage.steps, RunStep(turn)) DO   // invoke com source CHAT e turn.signal
+      IF turn.superseded THEN RETURN                                // resultado tardio nunca renderiza
+      EMIT BlockFor(settled)                                        // renderização progressiva
+    END FOR
+  END FOR
+  memory ← Remember(memory, parsed)                                 // só em memória; limpa ao bloquear/sair
+END PROCEDURE
+```
+
+- Pergunta, recibo e links locais aparecem em até 100 ms após o envio, e buscas mostram skeleton imediato e blocos progressivos. Os slots obrigatórios vêm do `validate` de cada skill, e só o primeiro faltante é perguntado (ex.: “Quem pagou?” com chips dos participantes). Não há polling nem re-planejamento automático após falha; follow-ups (“e para 3 pessoas?”, “só direto”, “e em dezembro?”) reutilizam os slots da última busca; falha de skill vira bloco `error` com ação segura (“Tentar de novo” ou links), nunca stack ou corpo upstream.
+
+### 7.12.6 Catálogo de skills
+
+| Skill | Agente | Tipo | Exposição | Encapsula |
+|---|---|---|---|---|
+| `travel.flights.search`, `travel.stays.search` | travel | read | chat, ui | `market-client` + `PlannerRanking` (7.13) |
+| `travel.links.build`, `travel.trip.list`, `travel.trip.summary` | travel | read | chat, ui | `PlannerTravel.validate`/`build` dos 26 provedores; viagens com orçamento, gasto e guardado |
+| `travel.trip.create`, `travel.trip.update` | travel | write | chat, ui | formulário de viagem e “Salvar como viagem” |
+| `finance.transaction.create`, `finance.budget.set`, `finance.goal.create`, `finance.goal.update` | finance | write | chat, ui | receita/gasto com pagador, divisão, `tripId` e recorrência; orçamento por categoria; metas |
+| `finance.summary`, `finance.settlements`, `finance.report` | finance | read | chat, ui | totais, `calculateSettlements` e relatório mensal |
+| `finance.transaction.update`, `finance.recurring.materialize`, `finance.report.csv` | finance | write, read | ui | edição, `materializeRecurring` e CSV local |
+| `planner.checklist.add`, `planner.checklist.toggle`, `planner.decision.create`, `planner.decision.vote`, `planner.decision.close`, `planner.participant.add`, `planner.workspace.rename` | planner | write | chat, ui | checklist, decisões (`vote`), participantes e nome do workspace |
+| `planner.checklist.list`, `planner.decision.list` | planner | read | chat, ui | listagens |
+| `*.delete`, `planner.participant.remove`, `planner.workspace.reset` | do domínio | write | ui | exclusões, `removeFinance`, `removeParticipant` e reset |
+| `planner.backup.export`, `planner.backup.import`, `planner.account.password`, `planner.account.lock`, `planner.account.destroy`, `planner.security.settings` | planner | read, write | ui | backup, conta e segurança via `PlannerLocal` |
+| `assist.help`, `assist.interpret`, `assist.undo` | orchestrator | read, write | chat (`assist.undo` também ui) | ajuda contextual, interpretação remota opcional (7.12.7) e desfazer o último recibo |
+
+Toda skill de escrita usa o `commit` existente (`Repository.update` com as validações de `PlannerCore`). UI e chat compartilham `validate` e `run`: os handlers de formulário de `app.js` passam a chamar `runtime.invoke(id, input, { source: UI })`, sem segundo caminho de escrita (decisão 9).
+
+### 7.12.7 Política de autonomia
+
+- **Leitura** (busca, listagem, resumo, cálculo e links) executa automaticamente e aparece na faixa de atividade.
+- **Escrita por comando explícito local** (intent de escrita com confiança ≥ 0,75 e todos os slots extraídos localmente) executa uma vez e emite `receipt` com “Desfazer”, disponível por 30 s ou até a próxima escrita; o desfazer aplica a pré-imagem guardada em memória e é recusado, com aviso, se a entidade mudou.
+- **Escrita com slot remoto ou confiança local < 0,75** vira `confirmation` com resumo campo a campo e só executa, uma vez, após clique confiável (`isTrusted`) no card (decisão 26).
+- **Skills `exposure: ui`** nunca entram no plano; no chat, o orquestrador indica em `text` a tela onde fazer. **Navegação externa** só ocorre por clique em link validado pela allowlist de `PlannerTravel`, com `noopener` e `noreferrer`.
+- **IA habilitada** significa `/api/status` com IA disponível e opt-in da sessão nomeando provedor, host e modelo. `interpret` envia só o texto digitado (≤ 1.000 caracteres) e os nomes dos slots pendentes, nunca dados do workspace; o JSON exato fica em “Ver envio” na faixa de atividade, aberto no primeiro envio da sessão (prévia de 7.10.5); a resposta só vale se passar no schema `{ intent ∈ allowlist, slots tipados, confidence ∈ [0, 1] }`, e a busca resultante é leitura do orquestrador local, não ação da IA.
+
+## 7.13 Agente de Viagens e busca ativa de mercado
+
+### 7.13.1 Fontes de mercado
+
+O portal Self-Service da Amadeus for Developers foi desativado em 17/07/2026: as chaves self-service foram desligadas e só as APIs Enterprise seguem disponíveis ([PhocusWire](https://www.phocuswire.com/amadeus-shut-down-self-service-apis-portal-developers), [AirLabs](https://airlabs.co/amadeus-self-service-api-shutdown)), por isso a Amadeus fica fora. Voos usam a Duffel, cujo test mode é gratuito e responde com a companhia fictícia “Duffel Airways” ([quick start](https://duffel.com/docs/guides/quick-start), [test mode](https://duffel.com/docs/api/overview/test-mode)). Como o Duffel Stays exige pedido de acesso ([Stays](https://duffel.com/docs/guides/getting-started-with-stays)), hospedagem usa LiteAPI/Nuitee Connect com chave sandbox ([hotels/rates](https://docs.liteapi.travel/reference/post_hotels-rates), [estrutura da resposta](https://docs.liteapi.travel/docs/hotel-rates-api-json-data-structure)). Conteúdo das fontes parafraseado para conformidade com restrições de licenciamento.
+
+### 7.13.2 Servidor local, rotas e configuração
+
+```text
+scripts/
+  dev-server.mjs          # entrada: carrega a config, cria o app-server e escuta só em loopback
+  server/app-server.mjs   # estáticos GET/HEAD, rewrites, roteador /api/* e CSP por página
+  server/api-guard.mjs    # guarda comum das rotas /api/*
+  server/config.mjs       # ambiente + .env.local (gitignored) com validação; nunca registra valores
+  server/upstream.mjs     # fetch nativo com timeout, redirect: "error", host fixo e teto de bytes
+  market/duffel-flights.mjs, market/liteapi-stays.mjs   # adapters de busca
+  market/normalize.mjs    # respostas Duffel/LiteAPI → FlightOffer/StayOffer
+  assistant/              # interpretação opcional: adapters openai-compatible e anthropic, JSON validado por schema
+.env.example              # somente nomes de variáveis
+```
+
+Sem dependências (`node:http` e `fetch` nativo). A guarda roda antes de qualquer upstream: somente `POST` (demais métodos recebem 405 sem `Access-Control-*`); Host exatamente `localhost`, `127.0.0.1` ou `[::1]` na porta vinculada; Origin igual à origem do Host; `Sec-Fetch-Site`, quando presente, `same-origin`; `X-PlannerDuo: 1`; `Content-Type: application/json`; corpo ≤ 64 KiB lido em stream; JSON estrito sem `__proto__`, `constructor`, `prototype` ou campo desconhecido; rate limit por rota (mercado: 30/min e 2 em voo; interpretação: limites de 7.10.2) com `Retry-After`; sem CORS e sem cookies; respostas JSON com `Cache-Control: no-store` e `nosniff`.
+
+| Rota | Entrada | Saída |
+|---|---|---|
+| `POST /api/status` | `{}` | `{ market: { flights: { configured }, stays: { configured, live } }, ai: { available, provider, host, model, local } }`, nunca chaves |
+| `POST /api/market/flights` | `{ slices: [{ origin, destination, date }] (1–2), adults (1–9), childrenAges, cabin, directOnly }` | `{ offers: List<FlightOffer>, fetchedAt, truncated }` |
+| `POST /api/market/stays` | `{ place, checkin, checkout, occupancies: [{ adults, childrenAges }] (1–4), refundableOnly }` | `{ offers: List<StayOffer>, fetchedAt, truncated }` |
+| `POST /api/assistant/interpret` | `{ text (≤ 1.000), pending: List<SlotName>, today }` | `{ intent, slots, confidence }` validado por schema |
+
+| Variável | Regra |
+|---|---|
+| `PLANNERDUO_DUFFEL_TOKEN` | `[A-Za-z0-9_-]{20,512}`; ausente ou inválida desliga só voos |
+| `PLANNERDUO_LITEAPI_KEY` | prefixo `sand_`/`sandbox_` (teste, `live = false`) ou `prod_` (produção), conforme a [documentação da LiteAPI](https://docs.liteapi.travel/reference/prompt-for-vibe-coding-tools); outro desliga só hospedagem |
+| `PLANNERDUO_AI_PROVIDER` (`openai-compatible` ou `anthropic`, no lugar de `PLANNERDUO_AI_ADAPTER`), `PLANNERDUO_AI_API_KEY`, `PLANNERDUO_AI_MODEL`, `PLANNERDUO_AI_BASE_URL` | Regras de 7.10.2–7.10.3, inclusive anti-SSRF |
+| `PLANNERDUO_MARKET_CURRENCY` (`BRL`), `PLANNERDUO_GUEST_NATIONALITY` (`BR`) | ISO 4217 do catálogo de 7.11.1 e ISO 3166-1 alfa-2 |
+
+- Ambiente tem precedência sobre `.env.local` (já ignorado por `.env.*`); erro de configuração desliga só o recurso afetado e registra o nome da variável, nunca o valor. Chaves vivem em closures dos adapters e nunca chegam ao navegador, logs, `public/`, workspace ou backups.
+- Upstream: hosts fixos `api.duffel.com` e `api.liteapi.travel`, sem base URL configurável; `redirect: "error"`; tetos de 8 MiB e 4 MiB e timeouts de 15 s e 12 s. Acima de 1.000 voos ou 300 hospedagens, ficam as de menor preço (desempate por `id`), com `truncated: true`.
+- Duffel: `POST /air/offer_requests?return_offers=true&supplier_timeout=10000` com `Authorization: Bearer`, `Duffel-Version: v2`, `Accept` e `Content-Type` JSON; corpo `data.slices` (`origin`, `destination`, `departure_date`), `passengers` (`{ type: "adult" }` ou `{ age }`), `cabin_class` e `max_connections` (0 com “direto”, senão 1).
+- LiteAPI: `POST /v3.0/hotels/rates` com `X-API-Key`; `checkin`, `checkout`, `currency`, `guestNationality`, `occupancies[{ adults, children }]` e local por `cityName` + `countryCode` de `PlannerPlaces` (coordenadas com `radius` de 15.000 m se a cidade for ambígua); `limit: 50`, `maxRatesPerHotel: 3`, `timeout: 8`, `includeHotelData: true`, `minReviewsCount: 30` e `refundableRatesOnly` quando pedido. Nome, endereço e rating são lidos de forma defensiva em `data[]` ou na lista de hotéis anexa, por `hotelId`.
+- Erros: `market/not-configured`, `market/forbidden`, `market/request-invalid`, `market/rate-limited`, `market/upstream-auth`, `market/upstream-unavailable`, `market/timeout` e `market/response-invalid`, sem repassar o corpo upstream; `interpret` usa os códigos `assistant/*` de 13.4. Testes injetam `fetchImpl` falso: zero chamadas reais.
+
+### 7.13.3 Modelos normalizados
+
+```pascal
+STRUCTURE FlightOffer                            // transitório; nunca persistido
+  id: OpaqueText;  source: "Duffel";  live: Boolean (live_mode);  fetchedAt;  expiresAt: Optional<Timestamp>
+  price: { totalMinor: PositiveSafeInteger, currency: Iso4217 }    // total_amount (string) → unidades menores, sem float
+  owner: { iata: Optional<Text>, name: Text }
+  flexibility: { refundable, changeable: YES OR NO OR UNKNOWN }    // conditions.*.allowed
+  slices: List<{                                                   // 1 ou 2
+    origin, destination: IataCode;  durationMin: PositiveInteger  // ISO 8601 → minutos
+    segments: List<{ from, to, departLocal, arriveLocal, durationMin, marketing: { iata, name, flightNumber },
+                     operating: { iata, name }, cabin }>
+    connections: List<{ airport, minutes, airportChange, overnight, international: Boolean }>
+    baggage: { checked, carryOn: NonNegativeInteger OR UNKNOWN } }>  // mínimo entre segmentos do 1º adulto
+END STRUCTURE
+
+STRUCTURE StayOffer                              // transitório; nunca persistido
+  id: OpaqueText (offerId);  hotelId;  source: "LiteAPI";  live: Boolean (prefixo da chave);  fetchedAt
+  name: Text;  address: Optional<Text>;  stars: Optional<0..5>;  rating: Optional<0..10>;  reviews: Optional<Integer ≥ 0>
+  nights: 1..30;  totalMinor, perNightMinor: PositiveSafeInteger;  currency: Iso4217
+  board: Text;  breakfast: Boolean;  refundable: Boolean          // refundableTag = "RFN"
+END STRUCTURE
+```
+
+- `departing_at` e `arriving_at` são horários locais de cada aeroporto: a conexão é a diferença entre chegada e partida no mesmo aeroporto, `overnight` indica que ela atravessa 00:00 local, e `international` vale quando um segmento adjacente cruza países (país desconhecido conta como internacional). Total da hospedagem: `offerRetailRate` ou, na ausência, a soma de `retailRate.total[0]` por quarto; `perNightMinor = HALF_EVEN(totalMinor / nights)`; `breakfast` e `stars` vêm de `boardName` e dos dados do hotel por allowlist. Textos externos são limpos (sem controle ou bidi, até 120 caracteres) e renderizados só com `textContent`.
+
+### 7.13.4 Política estrita e ranking
+
+```pascal
+INTERFACE PlannerRanking                         // puro e determinístico; relógio injetado
+  METHOD rankFlights(offers, criteria: { now, directOnly, maxPriceMinor }) RETURNS RankingResult
+  METHOD rankStays(offers, criteria: { now, refundableOnly, maxPriceMinor }) RETURNS RankingResult
+END INTERFACE
+
+STRUCTURE RankingResult
+  recommended: List<{ offer, score: 0..100, labels: Set<Label>, reasons: List<PtBrText> }>   // no máximo 5
+  input, approved: NonNegativeInteger;  discarded: Map<DiscardReason, PositiveInteger>;  currency: Iso4217
+END STRUCTURE
+```
+
+- **Voos**: cada oferta é aprovada ou descartada pela primeira regra violada, nesta ordem: `invalid` (estrutura, datas, duração ou preço ≤ 0); `currency` (moeda diferente da predominante; empate → `PLANNERDUO_MARKET_CURRENCY`); `expired` (`expiresAt ≤ now`); `unknown-carrier`; `price-ceiling`; `stops` (mais de 1 escala por trecho, ou qualquer escala com “direto”); `airport-change`; `short-connection` (< 60 min, ou < 90 min se internacional); `long-connection` (> 8 h, ou pernoite de 4 h ou mais); e, por último, `too-slow` (duração > 2× a da mais rápida entre as que passaram nas regras anteriores).
+- **Hospedagem**: `invalid` (nome, noites ou preço), `currency`, `price-ceiling`, `not-refundable` (quando pedido), `unrated`, `low-rating` (< 7,5/10) e `few-reviews` (< 30, quando informado).
+- **Score** inteiro de 0 a 100 (`HALF_EVEN`), com mínimos calculados sobre os aprovados. Voos: 45 × preçoMín/preço + 25 × duraçãoMín/duração + 10 × escalas (1 direto; 0,5 com uma) + 10 × bagagem (1 despachada; 0,5 só de mão; 0 desconhecida) + 5 × flexibilidade (1 reembolsável; 0,5 só remarcável) + 5 × horário (1 sem partida ou chegada entre 00:00 e 05:59 locais). Hospedagem: 45 × porNoiteMín/porNoite + 35 × rating/10 + 10 × reembolsável + 5 × café + 5 × estrelas/5.
+- **Ordem e rótulos**: score desc, preço asc, duração asc (voos) e `id` asc. `best-value` é o 1º; `cheapest`, o menor preço (desempate por duração e `id`); `fastest`, a menor duração (desempate por preço e `id`); `flexible`, reembolsável ou, em voos, remarcável; `direct`, sem conexões.
+- **Recomendados**: top 5, e `cheapest`/`fastest` fora dele substituem as últimas posições, mantendo a ordem por score; até 3 motivos por card, de uma tabela fixa pt-BR (“Menor preço entre as opções confiáveis”, “Direto”, “Conexão de 1 h 35 min em GRU”, “Bagagem despachada incluída”, “Nota 8,9 com 1.240 avaliações”), e resumo de descartes com contagem por motivo. No navegador, filtro e score rodam em fatias de até 500 ofertas por tarefa.
+- **Honestidade**: todo preço mostra fonte e horário da consulta (“Duffel · consultado às 14:32”), a validade quando houver `expiresAt` e o selo “Ambiente de teste” quando `live = false`; não há conversão de moeda (o câmbio segue manual) nem preço inventado; a compra abre, por clique, um provedor do censo com rota e datas (a própria companhia quando for LATAM, GOL ou Azul).
+
+### 7.13.5 Fluxo do Agente de Viagens
+
+- O agente entende a mensagem em linguagem natural (7.12.3), sem comandos fixos, e pergunta só o que falta, um slot por vez e com chips (destino → origem → ida → volta ou noites); sem menção, passageiros = 1 adulto, exibido e editável no resumo.
+- Voos e hospedagem, via `market-client.js` (único `fetch` do navegador: same-origin, `X-PlannerDuo: 1`, `AbortSignal` do turno e resposta validada por schema), e links locais rodam em paralelo, com timeouts de 20 s, 15 s e 1 s; links aparecem primeiro e skeletons ocupam o lugar das buscas. Cache: 5 min para voos (nunca além do menor `expiresAt`) e 10 min para hospedagem, em LRU de 50 entradas.
+- Sem API configurada, com upstream indisponível, circuito aberto ou zero aprovados, o agente mostra os links dos 26 provedores confiáveis com rota e datas exatas, conforme o `deepLinkMode` de cada um, e o resumo de descartes, sem inventar preço. “Salvar como viagem” invoca `travel.trip.create` com destino, datas e a oferta escolhida em texto nas notas, com recibo e “Desfazer”.
+
+## 7.14 Identidade visual minimalista e futurista
+
+### 7.14.1 Tokens
+
+```pascal
+STRUCTURE VisualTokens                          // DARK padrão; LIGHT opcional com os mesmos papéis
+  bg: #05060a + radial índigo #7c8cff (≤ 14%) + radial ciano #3ee0ff (≤ 10%)   // fixos, sem animação
+  surface: rgba(255,255,255,.035) | raised .06, com backdrop-filter: blur(16px)
+  surface_fallback: #0c0e14 | #13151c          // sem suporte a backdrop-filter
+  line: rgba(255,255,255,.08) | strong .14
+  text: #f4f6fb | muted #b4bccd | subtle #8e97ab                  // ≥ 4,5:1
+  accent: linear-gradient(135deg, #7c8cff, #3ee0ff);  on_accent: #05060a (≥ 6,8:1)
+  status: success #3ddc97 | warning #ffc857 | danger #ff6b7a | info #5cc8ff   // sempre com texto ou ícone
+  font: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif
+  size: body 16 | secundário 14 | label 14 (mín. 13) | h3 20 | h2 24 | h1 clamp(28px, 3vw + 12px, 40px)
+  space: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96;  radius: 10 | 14 | 20 | 28 | pill 999
+  elevation: borda + 0 8px 24px rgba(0,0,0,.35);  glow: 0 0 0 1px rgba(124,140,255,.35), 0 0 24px rgba(62,224,255,.18)
+  motion: 120 | 200 | 320 ms, cubic-bezier(.2,.8,.2,1);  reduce ⇒ 0 ms, sem parallax nem shimmer
+  focus: anel 2px #3ee0ff + offset 2px (≥ 3:1);  target ≥ 44px;  números com tabular-nums
+END STRUCTURE
+```
+
+- Os brilhos ficam em cantos opostos (índigo no alto à esquerda, ciano embaixo à direita), sem sobreposição atrás de conteúdo; assim, `subtle` sobre glass mantém cerca de 5:1 no pior ponto, e o gate mede o contraste sobre o fundo computado (14.3). Tema claro: fundo `#f6f7fb`, superfície `#ffffff`, texto `#0b0d14`/`#3d4457`/`#5a6275` e destaque sólido `#4f5bd5`, todos ≥ 4,5:1. Não há fonte externa nem `@font-face` remoto; Inter só aparece se já estiver instalada.
+
+### 7.14.2 Layout, componentes e caça a bugs visuais
+
+- **Shell**: sidebar de 248 px (Central, Painel, Viagens, Finanças, Metas, Checklist, Decisões, Relatórios e Configurações) e conteúdo de até 1180 px; até 900 px a sidebar vira drawer modal (foco preso, `Escape` fecha e o foco volta ao botão de menu); até 600 px, uma coluna; nenhuma viewport a partir de 320 px tem overflow horizontal.
+- **Central** (tela inicial após o login; `/app` abre a view `central`): compositor com campo multilinha rotulado e botão “Enviar”, chips de sugestão, faixa de atividade dos agentes (`role="status"`, um anúncio por mudança) e conversa em `role="log"` com `aria-live="polite"`; respostas como blocos tipados.
+- **Componentes** sobre os tokens e os estados de 7.9.5: botões (primário em gradiente, secundário glass, fantasma e de ícone com nome acessível), inputs e selects com rótulo persistente, chips, tabs, cards glass, KPI, bolhas de chat, skeleton (estático com movimento reduzido), toast, diálogos e tiles de provedores com ícone real local (7.8.11) ao lado do nome.
+- **Card de voo**: companhia em texto (nome e código, sem logotipo remoto ou monograma), horários grandes com “+1” quando chega no dia seguinte, duração, escalas com aeroporto e tempo de conexão, bagagem, flexibilidade, preço tabular com moeda, rótulos, motivos, linha de honestidade (7.13.4) e ações “Ver opções de compra” e “Salvar como viagem”. **Card de hospedagem**: nome, nota/10 e avaliações, noites, total e por noite, regime, reembolsável, linha de honestidade e as mesmas ações.
+- **Caça a bugs visuais** (gate da etapa 3): escala de espaço única, alinhamento consistente nos cards, todo botão com nome, foco visível e alvo ≥ 44 px, uma pilha tipográfica computada em todo texto, nada abaixo de 13 px, nenhum corte ou sobreposição de 360 a 1440 px e em zoom de 200%, ícones decorativos com `aria-hidden` e copy sem “cofre” ou “vault” (7.7).
 
 ## Data Models
 
@@ -4112,6 +4422,30 @@ Os critérios 5.1–5.22 são planejados, correspondem 1:1 aos itens desta propr
 21. **Consent binding:** quando adapter, host ou modelo do status diferem do consentimento registrado, nenhuma requisição `chat` é enviada até novo aceite.
 22. **Zero real provider calls in tests:** a suíte automatizada não contata nenhum provedor real; toda chamada upstream vai ao upstream falso local ou falha pelo guard de rede.
 
+### Property 6: Orchestrator, Travel Agent and Market Properties
+
+**Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17**
+
+Os critérios 6.1–6.17 são planejados, correspondem 1:1 aos itens desta propriedade e serão criados na atualização de `requirements.md`.
+
+1. **Routing totality:** para toda string (vazia, longa, com controle, bidi ou emoji), `PlannerNLU.parse` nunca lança, devolve intent da allowlist ou `unknown` e `confidence ∈ [0, 1]`, e o turno produz ao menos um bloco tipado.
+2. **Normalization idempotence:** `normalize(normalize(s)) = normalize(s)`, e, para o mesmo contexto e relógio, `parse(s)` e `parse(normalize(s))` produzem a mesma intent, a mesma confiança e os mesmos slots estruturados (texto livre, como `description`, preserva o original).
+3. **Date validity:** com relógio injetado, toda data de viagem extraída (ida, volta, check-in e check-out) é ISO `YYYY-MM-DD` real e não passada, e volta > ida (check-out > check-in); entrada que viole isso gera pergunta, nunca busca.
+4. **Slot completeness:** uma skill de busca só é invocada com todos os slots exigidos; caso contrário, o turno tem exatamente um bloco `question` e zero chamadas de mercado.
+5. **Turn supersession:** quando chega a mensagem `n + 1`, o turno `n` é abortado, e nenhum bloco, evento ou recibo dele é renderizado depois disso.
+6. **Bounded concurrency:** em todo instante há no máximo 4 skills em execução.
+7. **Dedupe and cache:** leituras com a mesma chave canônica em voo compartilham uma execução; dentro do TTL, a repetição faz zero chamadas de rede; escritas nunca são deduplicadas nem cacheadas; o cache respeita o limite LRU e é limpo ao bloquear ou sair.
+8. **Circuit breaker:** após 3 falhas consecutivas elegíveis de uma chave, toda invocação falha com `skill/circuit-open` sem rede por 30 s; depois, uma única tentativa de prova fecha ou reabre o circuito.
+9. **Retry bound:** cada invocação faz no máximo 2 tentativas, e a segunda só ocorre em leitura com erro `retryable`; escrita nunca é repetida automaticamente.
+10. **Ranking soundness:** recomendados ⊆ entrada, todo recomendado satisfaz todas as regras de 7.13.4, há no máximo 5, e cada oferta é aprovada ou descartada com exatamente um motivo, de modo que aprovados + Σ descartes = |entrada|.
+11. **Determinism and permutation invariance:** para toda lista de ofertas, toda permutação dela e o mesmo relógio, o ranking produz o mesmo resultado (ordem, scores, rótulos, motivos e contagens).
+12. **Label correctness:** `best-value` tem o maior score, `cheapest` o menor preço e `fastest` a menor duração entre os aprovados, com os desempates de 7.13.4; `direct` ⇔ zero conexões; `flexible` ⇔ reembolsável (ou remarcável, em voos); cada um de `best-value`, `cheapest` e `fastest` marca no máximo uma oferta.
+13. **Key isolation and API guard:** tokens Duffel/LiteAPI e a chave de IA nunca aparecem em respostas, logs, `public/`, workspace, backups ou repositório; o único `fetch` do navegador está em `market-client.js` e alcança só os quatro paths same-origin; toda requisição fora da guarda de 7.13.2 é rejeitada com zero chamadas upstream e sem header `Access-Control-*`.
+14. **Market data honesty:** todo preço exibido mostra fonte, horário da consulta e, com `live = false`, o selo “Ambiente de teste”; nenhuma oferta expirada é recomendada; nenhum valor é convertido ou inventado; a compra só abre o site do provedor por clique.
+15. **Autonomy policy:** leituras executam sem confirmação; escrita de comando local explícito executa uma vez com recibo e “Desfazer”, que restaura a pré-imagem ou é recusado se a entidade mudou; escrita com slot remoto não altera o workspace sem clique confiável; skill `exposure: ui` nunca é invocada pelo chat; nenhuma navegação externa ocorre sem clique.
+16. **Single UI/chat path:** para toda entrada válida, a mesma skill invocada pela UI ou pelo chat produz o mesmo workspace e os mesmos erros, pelo mesmo `commit`.
+17. **Non-blocking UI:** nenhuma etapa síncrona do navegador excede 50 ms no ambiente de referência de 14.13 ao interpretar uma mensagem de 1.000 caracteres, ranquear 5.000 ofertas em fatias ou renderizar 30 cards, e a UI segue responsiva durante buscas paralelas lentas ou falhas.
+
 ## Error Handling
 
 ### 13.1 Access Form State Machine
@@ -4405,6 +4739,18 @@ Nenhum watcher ou processo interativo integra execução automatizada.
 - CSS e HTML sem `@import` remoto, `@font-face` com origem externa ou `url(http...)`.
 - Smoke HTTP: `GET` e `OPTIONS` em `/api/assistant` → 405 sem `Access-Control-*`; `POST` com Host ou Origin inválidos → 403; `op: "status"` sem configuração → `available: false`; `GET /.env.local` devolve o fallback de `index.html`, sem nenhum padrão de chave.
 - A checagem atual de ausência de Firebase e CDN continua; o texto final passa de “sem dependências externas” para “sem dependências externas de runtime”.
+
+### 14.13 Orchestrator, Travel Agent and Market Tests (adendo 2026-09-29)
+
+- **Runtime (Property 6.6–6.9):** relógio, aleatoriedade e `fetch` falsos; fast-check gera cargas com latências, falhas `retryable` e não `retryable` e abortos, e verifica pico ≤ 4, dedupe por chave canônica, TTL/LRU, abertura e meia-abertura do circuito e no máximo um retry, só em leitura.
+- **NLU (6.1–6.4):** corpus versionado `tests/fixtures/nlu/pt-br.json` com frases reais (“voo de BH pra Salvador dia 12/11 volta 18/11”, “hotel em Gramado 3 noites a partir de sexta”, “quero ir pra Lisboa em dezembro com minha esposa e meu filho de 6 anos”, “só voo direto até 2 mil”, “gastei 120 no mercado na viagem do Rio”, “e pra 3 pessoas?”), datas relativas com relógio injetado (virada de mês e ano, bissexto), aliases sem acento e ambiguidade; fast-check para totalidade e idempotência.
+- **Ranking (6.10–6.12 e 6.14):** fast-check com no mínimo 100 iterações por propriedade e geradores de ofertas válidas e adversariais (conexões de 59/60/89/90 min, troca de aeroporto, pernoite, oferta expirada, companhia ausente, moedas mistas, preço zero, negativo ou malformado); oráculo de partição, permutações e rótulos.
+- **Orquestrador (6.5 e 6.15–6.17):** estresse com 100 mensagens em rajada (0–20 ms entre elas) contra upstream falso lento (até 25 s) e falho (500, timeout, JSON inválido): só o último turno renderiza, nada tardio aparece, as chamadas ficam dentro de dedupe e breaker e nenhuma tarefa passa de 50 ms (`performance.now()`, CPU sem throttling); política de autonomia e “Desfazer” com workspace em memória.
+- **Servidor (6.13 e 6.14):** `scripts/server/**` e adapters com `fetchImpl` falso que registra URL, headers e corpo pretendidos (host exato, `Duffel-Version: v2`, `X-API-Key`, `return_offers`, `supplier_timeout`); matriz da guarda (método, Host, Origin, `Sec-Fetch-Site`, `X-PlannerDuo`, `Content-Type`, 64 KiB e 64 KiB + 1, `__proto__`, rate limit) com zero chamadas upstream; fixtures sintéticas Duffel/LiteAPI, inclusive com campos ausentes ou em posição alternativa; varredura de tokens gerados em respostas e logs; guard global que falha em conexão fora do loopback.
+- **DOM do Central:** harness `node:vm` com DOM mínimo de teste, sem dependência nova, cobrindo ordem e tipo dos blocos, chips, `role="log"`/`aria-live` e estados vazio, erro e skeleton.
+- **Smoke browser opcional:** `scripts/smoke-browser.mjs` localiza Chrome ou Edge instalados, abre via CDP (`--remote-debugging-port` e `WebSocket` nativo do Node) o app servido localmente com upstream falso e mede overflow horizontal em 360, 390, 768, 1024 e 1440 px, alvos ≥ 44 px, pilha tipográfica única, foco visível e zero requisições externas; sem navegador, informa “pulado” sem falhar o gate.
+- **`verificar-frontend.mjs`:** 14.12 vale com três trocas: `fetch(` só em `public/modules/agents/market-client.js`, para `/api/status`, `/api/market/flights`, `/api/market/stays` e `/api/assistant/interpret`; o smoke HTTP cobre essas quatro rotas (`GET` e `OPTIONS` → 405 sem `Access-Control-*`, Host ou Origin inválidos → 403, `/api/status` sem configuração → nada disponível); e a varredura de chaves inclui `duffel_` seguido de modo e token ([test mode](https://duffel.com/docs/api/overview/test-mode)), `sand_`, `sandbox_` e `prod_` seguidos de UUID ([LiteAPI](https://docs.liteapi.travel/reference/prompt-for-vibe-coding-tools)) e atribuições com valor de `PLANNERDUO_DUFFEL_TOKEN` ou `PLANNERDUO_LITEAPI_KEY`. `public/modules/agents/**`, `public/modules/skills/**` e `public/modules/ui/central-view.js` também proíbem `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval` e `new Function`.
+- **Gate por etapa:** a etapa 1 exige Property 6.1–6.9, 6.15 e 6.16 e a regressão das fachadas; a etapa 2, 6.10–6.14; a etapa 3, a matriz de 14.3 nos dois temas e o smoke; a etapa 4, o estresse (6.5 e 6.17); em todas, `npm run verificar` é a última verificação.
 
 ## 15. Incremental Migration Strategy
 

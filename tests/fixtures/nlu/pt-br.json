@@ -1,0 +1,225 @@
+{
+  "clock": "2026-09-29T12:00:00",
+  "note": "Relógio fixo (segunda-feira, 29/09/2026, 12:00 local). Cada caso valida intent e slots-chave de PlannerNLU.parse.",
+  "cases": [
+    {
+      "text": "quero ir de São Paulo para Lisboa em 12/11 voltando dia 20",
+      "intent": "travel.search",
+      "slots": { "origin.id": "br-sao-paulo", "destination.id": "pt-lisboa", "departDate": "2026-11-12", "returnDate": "2026-11-20" }
+    },
+    {
+      "text": "passagens para Recife semana que vem",
+      "intent": "travel.flights",
+      "slots": { "destination.id": "br-recife", "departDate": "2026-10-05" },
+      "missing": ["origin", "returnDate"]
+    },
+    {
+      "text": "hotel em Gramado de 10 a 15/07 para 2 pessoas",
+      "intent": "travel.stays",
+      "slots": { "destination.id": "br-gramado", "departDate": "2027-07-10", "returnDate": "2027-07-15", "adults": 2 }
+    },
+    {
+      "text": "links para Salvador",
+      "intent": "travel.links",
+      "slots": { "destination.id": "br-salvador" }
+    },
+    {
+      "text": "planejar viagem para Paris em março",
+      "intent": "trip.create",
+      "slots": { "destination.id": "fr-paris", "monthOnly": "2027-03" }
+    },
+    {
+      "text": "minhas viagens",
+      "intent": "trip.list",
+      "slots": {}
+    },
+    {
+      "text": "como está a viagem para Lisboa?",
+      "intent": "trip.summary",
+      "slots": { "tripRef.id": "pt-lisboa" }
+    },
+    {
+      "text": "gastei 120 no mercado",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 12000, "financeType": "expense", "category": "alimentacao", "description": "mercado", "payer": "me" }
+    },
+    {
+      "text": "a Ana pagou 300 do hotel dividido com todos",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 30000, "financeType": "expense", "category": "viagem", "payer": "Ana", "splitWith": "all" }
+    },
+    {
+      "text": "recebi 5000 de salário",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 500000, "financeType": "income", "category": "salario" }
+    },
+    {
+      "text": "quanto gastei esse mês?",
+      "intent": "finance.summary",
+      "slots": { "month": "2026-09" }
+    },
+    {
+      "text": "quem deve para quem?",
+      "intent": "finance.settle",
+      "slots": {}
+    },
+    {
+      "text": "limite de 800 para alimentação",
+      "intent": "budget.set",
+      "slots": { "category": "alimentacao", "amountMinor": 80000 }
+    },
+    {
+      "text": "meta de 10 mil para Europa até dezembro",
+      "intent": "goal.create",
+      "slots": { "title": "Europa", "targetMinor": 1000000, "deadline": "2026-12" }
+    },
+    {
+      "text": "guardei 500 na meta Europa",
+      "intent": "goal.fund",
+      "slots": { "amountMinor": 50000, "goalRef": "Europa" }
+    },
+    {
+      "text": "como estão minhas metas?",
+      "intent": "goal.progress",
+      "slots": {}
+    },
+    {
+      "text": "adicionar passaporte ao checklist",
+      "intent": "checklist.add",
+      "slots": { "title": "passaporte" }
+    },
+    {
+      "text": "marcar passaporte como feito",
+      "intent": "checklist.done",
+      "slots": { "itemRef": "passaporte" }
+    },
+    {
+      "text": "o que falta no checklist?",
+      "intent": "checklist.list",
+      "slots": {}
+    },
+    {
+      "text": "criar votação: praia ou montanha",
+      "intent": "decision.create",
+      "slots": { "options": ["praia", "montanha"] }
+    },
+    {
+      "text": "voto em praia",
+      "intent": "decision.vote",
+      "slots": { "optionRef": "praia" }
+    },
+    {
+      "text": "adicionar participante Ana",
+      "intent": "participant.add",
+      "slots": { "participantName": "Ana" }
+    },
+    {
+      "text": "resumo de outubro",
+      "intent": "report.month",
+      "slots": { "month": "2026-10" }
+    },
+    {
+      "text": "desfazer",
+      "intent": "undo",
+      "slots": {}
+    },
+    {
+      "text": "ajuda",
+      "intent": "help",
+      "slots": {}
+    },
+    {
+      "text": "o que você faz?",
+      "intent": "help",
+      "slots": {}
+    },
+    {
+      "text": "oi",
+      "intent": "help",
+      "slots": {}
+    },
+    {
+      "text": "voo de BH pra Salvador dia 12/11 volta 18/11",
+      "intent": "travel.flights",
+      "slots": { "origin.id": "br-belo-horizonte", "destination.id": "br-salvador", "departDate": "2026-11-12", "returnDate": "2026-11-18" }
+    },
+    {
+      "text": "hotel em Gramado 3 noites a partir de sexta",
+      "intent": "travel.stays",
+      "slots": { "destination.id": "br-gramado", "departDate": "2026-10-02", "nights": 3 }
+    },
+    {
+      "text": "quero ir pra Lisboa em dezembro com minha esposa e meu filho de 6 anos",
+      "intent": "travel.search",
+      "slots": { "destination.id": "pt-lisboa", "monthOnly": "2026-12", "adults": 2, "childrenAges": [6] }
+    },
+    {
+      "text": "só voo direto até 2 mil",
+      "intent": "travel.flights",
+      "slots": { "directOnly": true, "maxPriceMinor": 200000 },
+      "missing": ["destination", "origin", "departDate", "returnDate"]
+    },
+    {
+      "text": "gastei 120 no mercado na viagem do Rio",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 12000, "financeType": "expense", "category": "alimentacao", "description": "mercado" }
+    },
+    {
+      "text": "quero ir pra floripa amanhã só ida",
+      "intent": "travel.search",
+      "slots": { "destination.id": "br-florianopolis", "departDate": "2026-09-30", "oneWay": true }
+    },
+    {
+      "text": "passagem pra sampa depois de amanhã",
+      "intent": "travel.flights",
+      "slots": { "destination.id": "br-sao-paulo", "departDate": "2026-10-01" }
+    },
+    {
+      "text": "voo para o rio daqui a 2 semanas",
+      "intent": "travel.flights",
+      "slots": { "destination.id": "br-rio-de-janeiro", "departDate": "2026-10-13" }
+    },
+    {
+      "text": "quero ir pra ny em 28/12 voltando dia 03/01",
+      "intent": "travel.search",
+      "slots": { "destination.id": "us-nova-york", "departDate": "2026-12-28", "returnDate": "2027-01-03" }
+    },
+    {
+      "text": "hotel em bariloche por 5 noites a partir de 10/08",
+      "intent": "travel.stays",
+      "slots": { "destination.id": "ar-bariloche", "departDate": "2027-08-10", "nights": 5 }
+    },
+    {
+      "text": "passagem para recife dia 31/02",
+      "intent": "travel.flights",
+      "missing": ["origin", "departDate", "returnDate"],
+      "noSlots": ["departDate"]
+    },
+    {
+      "text": "voo para madri em 10/05/2020",
+      "intent": "travel.flights",
+      "missing": ["origin", "departDate", "returnDate"],
+      "noSlots": ["departDate"]
+    },
+    {
+      "text": "quero ir pra santiago em novembro",
+      "intent": "travel.search",
+      "ambiguitySlot": "destination"
+    },
+    {
+      "text": "R$ 45,90 no ifood ontem",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 4590, "category": "alimentacao", "date": "ontem" }
+    },
+    {
+      "text": "paguei 1.200 de aluguel",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 120000, "category": "moradia", "payer": "me" }
+    },
+    {
+      "text": "gastei 1,2 mil com a passagem",
+      "intent": "finance.add",
+      "slots": { "amountMinor": 120000, "category": "viagem" }
+    }
+  ]
+}

@@ -17,6 +17,7 @@
     sessionExpiresAt: 0,
     lastActivityAt: Date.now(),
     autoLockTimer: null,
+    runtime: null,
   };
   const AUTO_LOCK_MS = 30 * 60 * 1000;
 
@@ -200,9 +201,6 @@
     return `${data.origin || 'Origem em aberto'} → ${data.destination} · ${period} · ${data.passengers} ${data.passengers === 1 ? 'viajante' : 'viajantes'}`;
   }
 
-  function buildTravelProviderSearch(provider, data) {
-    return Travel.build(provider.id, data, today());
-  }
 
   async function openTravelProvider(providerId) {
     const provider = TRAVEL_PROVIDERS.find((item) => item.id === providerId);
@@ -210,15 +208,28 @@
     const data = readTravelSearch(provider);
     if (!data) return;
 
-    let search;
-    try {
-      search = buildTravelProviderSearch(provider, data);
-    } catch (_) {
-      setTravelSearchStatus('Não foi possível preparar esse site com segurança.', 'error');
-      toast('Busca indisponível', 'Tente outro provedor.', 'error');
+    // A URL vem da skill travel.links.build (mesmos builders/allowlist). A
+    // navegacao externa continua ocorrendo so neste clique do usuario.
+    const result = await invokeUi('travel.links.build', {
+      origin: data.origin,
+      destination: data.destination,
+      departDate: data.departure,
+      returnDate: data.returnDate,
+      adults: data.passengers,
+      providerIds: [provider.id],
+    });
+    const link0 = result.ok ? result.value.links[0] : null;
+    if (!link0) {
+      setTravelSearchStatus('N\u00e3o foi poss\u00edvel preparar esse site com seguran\u00e7a.', 'error');
+      toast('Busca indispon\u00edvel', 'Tente outro provedor.', 'error');
       return;
     }
-
+    const search = {
+      url: link0.url,
+      mode: link0.mode,
+      prefilled: link0.mode !== 'manual',
+      warnings: link0.limitations || [],
+    };
     try {
       const link = document.createElement('a');
       link.href = search.url;
@@ -288,17 +299,27 @@
   async function lockVault(options) {
     if (state.locking) return;
     state.locking = true;
+    const allTabs = !options || options.allTabs !== false;
+    const runtime = state.runtime;
     try { state.unsubscribe?.(); } catch (_) {}
     state.unsubscribe = null;
     if (state.autoLockTimer) window.clearInterval(state.autoLockTimer);
     state.autoLockTimer = null;
     state.workspace = null;
     state.account = null;
+    state.runtime = null;
     try {
-      await Repository.auth.lock({ allTabs: !options || options.allTabs !== false });
+      // O bloqueio em si é a chamada de repositório da skill planner.account.lock;
+      // reset do runtime acontece em seguida (fila/cache/breakers).
+      if (runtime && typeof runtime.invoke === 'function') {
+        await runtime.invoke('planner.account.lock', { allTabs }, { source: 'ui' });
+      } else {
+        await Repository.auth.lock({ allTabs });
+      }
     } catch (_) {
       try { sessionStorage.setItem('plannerduo:auth-warning', 'Não foi possível confirmar o bloqueio das outras abas. Feche-as manualmente.'); } catch (_) {}
     } finally {
+      try { runtime?.reset(); } catch (_) {}
       redirectToLogin();
     }
   }
@@ -359,6 +380,99 @@
       }
       toast('Não foi possível salvar', error && error.message ? error.message : 'Tente novamente.', 'error');
       return false;
+    }
+  }
+  // --------------------------------------------------------------------------
+  // Runtime de skills: caminho único de leitura/escrita (decisão 9).
+  // --------------------------------------------------------------------------
+  const SkillRuntime = window.PlannerSkills;
+  async function skillCommit(mutator, meta) {
+    const options = meta || {};
+    const message = options.source === 'ui' ? options.message : undefined;
+    const saved = await commit((draft) => mutator(draft), message);
+    if (!saved) {
+      const error = new Error('Não foi possível salvar a alteração.');
+      error.code = 'local/commit-failed';
+      error.retryable = false;
+      error.publicMessage = 'Não foi possível salvar a alteração.';
+      throw error;
+    }
+    return state.workspace;
+  }
+  function createSkillRuntime() {
+    if (!SkillRuntime || typeof SkillRuntime.createRuntime !== 'function') return null;
+    const runtime = SkillRuntime.createRuntime({
+      core: Core,
+      travel: Travel,
+      local: Repository,
+      getWorkspace: () => state.workspace,
+      commit: skillCommit,
+    });
+    if (window.PlannerTravelSkills) window.PlannerTravelSkills.register(runtime);
+    if (window.PlannerFinanceSkills) window.PlannerFinanceSkills.register(runtime);
+    if (window.PlannerPlanningSkills) window.PlannerPlanningSkills.register(runtime);
+    return runtime;
+  }
+  const SKILL_FIELD_SELECTORS = {
+    'finance.transaction.create': {
+      type: '#transaction-type', description: '#transaction-description', amount: '#transaction-amount',
+      date: '#transaction-date', category: '#transaction-category', paidById: '#transaction-payer',
+      splitBetweenIds: '#transaction-split-options', tripId: '#transaction-trip', notes: '#transaction-notes',
+    },
+    'finance.transaction.update': {
+      type: '#transaction-type', description: '#transaction-description', amount: '#transaction-amount',
+      date: '#transaction-date', category: '#transaction-category', paidById: '#transaction-payer',
+      splitBetweenIds: '#transaction-split-options', tripId: '#transaction-trip', notes: '#transaction-notes',
+    },
+    'travel.trip.create': {
+      destination: '#trip-destination', startDate: '#trip-start', endDate: '#trip-end',
+      budget: '#trip-budget', saved: '#trip-saved', notes: '#trip-notes', emoji: '#trip-emoji',
+    },
+    'travel.trip.update': {
+      destination: '#trip-destination', startDate: '#trip-start', endDate: '#trip-end',
+      budget: '#trip-budget', saved: '#trip-saved', notes: '#trip-notes', emoji: '#trip-emoji',
+    },
+    'finance.goal.create': {
+      title: '#goal-title', target: '#goal-target', current: '#goal-current',
+      deadline: '#goal-deadline', description: '#goal-description', emoji: '#goal-emoji',
+    },
+    'finance.goal.update': {
+      title: '#goal-title', target: '#goal-target', current: '#goal-current',
+      deadline: '#goal-deadline', description: '#goal-description', emoji: '#goal-emoji',
+    },
+    'planner.checklist.add': { text: '#checklist-text', category: '#checklist-category', tripId: '#checklist-trip' },
+    'planner.checklist.update': { text: '#checklist-text', category: '#checklist-category', tripId: '#checklist-trip' },
+    'planner.decision.create': { title: '#decision-title', options: '#decision-options', description: '#decision-description' },
+    'finance.budget.set': { category: '#budget-category', amount: '#budget-amount' },
+    'planner.workspace.setup': { name: '#setup-workspace-name', participantNames: '#setup-participants' },
+    'planner.participant.add': { name: '#participant-name-input', color: '#participant-color-input' },
+    'planner.workspace.rename': { name: '#workspace-name-input' },
+  };
+  async function invokeUi(id, input) {
+    if (!state.runtime) {
+      return { ok: false, error: new Error('Runtime de skills indisponível.') };
+    }
+    try {
+      const value = await state.runtime.invoke(id, input, { source: 'ui' });
+      return { ok: true, value };
+    } catch (error) {
+      if (error && error.code === 'skill/invalid-input' && Array.isArray(error.fields) && error.fields.length) {
+        const map = SKILL_FIELD_SELECTORS[id] || {};
+        const first = error.fields[0];
+        toast('Revise os dados', first.message || 'Verifique os campos destacados.', 'error');
+        const selector = map[first.field];
+        if (selector) {
+          const el = $(selector);
+          if (el && typeof el.focus === 'function') { try { el.focus(); } catch (_) {} }
+        }
+        return { ok: false, error };
+      }
+      if (error && (error.code === 'local/commit-failed' || error.code === 'skill/not-found')) {
+        return { ok: false, error };
+      }
+      const message = (error && error.publicMessage) || (error && error.message) || 'Tente novamente.';
+      toast('Não foi possível concluir', message, 'error');
+      return { ok: false, error };
     }
   }
 
@@ -944,8 +1058,10 @@
     return `"${neutralized.replace(/"/g, '""')}"`;
   }
 
-  function exportCsv(sourceElement) {
+  async function exportCsv(sourceElement) {
     const panel = sourceElement && sourceElement.closest('[data-view-panel]');
+    // A seleção (filtros do painel) permanece na UI; a geração do CSV — com a
+    // proteção contra injeção de fórmula — vive na skill finance.report.csv.
     let finances = state.workspace.finances;
     if (panel && panel.dataset.viewPanel === 'finances') {
       finances = filteredFinances();
@@ -956,56 +1072,32 @@
       finances = finances.filter((finance) => months.has(finance.date.slice(0, 7))
         && (participantId === 'all' || finance.paidById === participantId));
     }
-    const headers = ['Data', 'Tipo', 'Descrição', 'Categoria', 'Participante', 'Valor', 'Dividido entre', 'Viagem', 'Observações'];
-    const rows = finances.map((finance) => {
-      const trip = state.workspace.trips.find((item) => item.id === finance.tripId);
-      return [
-        finance.date,
-        finance.type === 'income' ? 'Receita' : 'Despesa',
-        finance.description,
-        categoryMeta(finance.category).label,
-        participantName(finance.paidById),
-        finance.amount.toFixed(2).replace('.', ','),
-        finance.splitBetweenIds.map(participantName).join(' | '),
-        trip ? trip.destination : '',
-        finance.notes,
-      ];
-    });
-    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
-    download(`plannerduo-financas-${today()}.csv`, `\ufeff${csv}`, 'text/csv;charset=utf-8');
-    toast('CSV gerado', `${rows.length} ${rows.length === 1 ? 'lançamento exportado' : 'lançamentos exportados'}.`, 'success');
+    const financeIds = finances.map((finance) => finance.id);
+    const result = await invokeUi('finance.report.csv', { financeIds });
+    if (!result.ok) return;
+    download(`plannerduo-financas-${today()}.csv`, result.value.csv, 'text/csv;charset=utf-8');
+    toast('CSV gerado', `${result.value.count} ${result.value.count === 1 ? 'lançamento exportado' : 'lançamentos exportados'}.`, 'success');
   }
 
   async function exportBackup() {
-    try {
-      const encrypted = await Repository.exportEncrypted();
-      download(`plannerduo-cofre-${today()}.json`, encrypted, 'application/json');
-      toast('Backup criptografado concluído', 'O arquivo continua protegido pela senha do cofre.', 'success');
-    } catch (error) {
-      toast('Falha no backup', error.message || 'Não foi possível exportar o cofre.', 'error');
+    const result = await invokeUi('planner.backup.export', {});
+    if (!result.ok) {
+      toast('Falha no backup', (result.error && result.error.message) || 'Não foi possível exportar o cofre.', 'error');
+      return;
     }
+    download(`plannerduo-cofre-${today()}.json`, result.value.encrypted, 'application/json');
+    toast('Backup criptografado concluído', 'O arquivo continua protegido pela senha do cofre.', 'success');
   }
 
-  function applyChecklistTemplate() {
-    const templates = [
-      ['Documento de identificação', 'documentos'],
-      ['Comprovantes e reservas', 'documentos'],
-      ['Carregador do celular', 'tecnologia'],
-      ['Medicamentos de uso pessoal', 'saude'],
-      ['Itens de higiene', 'higiene'],
-      ['Roupas adequadas ao clima', 'roupas'],
-    ];
-    const existing = new Set(state.workspace.checklist.map((item) => item.text.toLocaleLowerCase('pt-BR')));
-    const additions = templates.filter(([text]) => !existing.has(text.toLocaleLowerCase('pt-BR')));
-    if (!additions.length) {
+  async function applyChecklistTemplate() {
+    const result = await invokeUi('planner.checklist.template', {});
+    if (!result.ok) return;
+    const added = Array.isArray(result.value && result.value.id) ? result.value.id.length : 0;
+    if (!added) {
       toast('Modelo já aplicado', 'Todos os itens sugeridos já estão no checklist.');
       return;
     }
-    commit((draft) => {
-      additions.forEach(([text, category]) => draft.checklist.push({
-        id: Core.id('check'), text, category, done: false, tripId: null, createdAt: new Date().toISOString(),
-      }));
-    }, 'Modelo adicionado ao checklist');
+    toast('Modelo adicionado ao checklist', '', 'success');
   }
 
   async function handleAction(action, element) {
@@ -1026,7 +1118,8 @@
     }
     if (action === 'dismiss-setup') {
       closeDialog($('#setup-dialog'));
-      return commit((draft) => { draft.settings.onboardingCompleted = true; });
+      await invokeUi('planner.workspace.onboarding', { completed: true });
+      return;
     }
     if (action === 'clear-finance-filters') {
       $('#finance-search').value = '';
@@ -1059,72 +1152,60 @@
       const count = state.workspace.checklist.filter((item) => item.done).length;
       if (!count) return toast('Nada para remover', 'Marque itens como concluídos primeiro.');
       if (confirm(`Remover ${count} ${count === 1 ? 'item concluído' : 'itens concluídos'}?`)) {
-        commit((draft) => { draft.checklist = draft.checklist.filter((item) => !item.done); }, 'Itens concluídos removidos');
+        const result = await invokeUi('planner.checklist.clear-completed', {});
+        if (result.ok) toast('Itens concluídos removidos', '', 'success');
       }
       return;
     }
     if (action === 'reset-workspace') {
       const confirmation = prompt('Esta ação apaga permanentemente o banco local. Digite APAGAR para confirmar:');
       if (confirmation !== 'APAGAR') return toast('Exclusão cancelada', 'Nenhum dado foi alterado.');
-      try {
-        state.workspace = await Repository.reset();
+      const result = await invokeUi('planner.workspace.reset', {});
+      if (result.ok) {
         state.voterByDecision = {};
         renderAll();
         toast('Banco local apagado', 'O PlannerDuo voltou ao estado inicial vazio.', 'success');
         prepareNewDialog('setup-dialog');
         showDialog($('#setup-dialog'));
-      } catch (error) {
-        toast('Não foi possível apagar', error.message, 'error');
+      } else {
+        toast('Não foi possível apagar', (result.error && result.error.message) || 'Tente novamente.', 'error');
       }
       return;
     }
     if (action === 'edit-finance') return editFinance(id);
     if (action === 'delete-finance') {
       if (confirm('Excluir esta transação?')) {
-        commit((draft) => Core.removeFinance(draft, id).workspace, 'Transação excluída');
+        await invokeUi('finance.transaction.delete', { id });
       }
       return;
     }
     if (action === 'edit-trip') return editTrip(id);
     if (action === 'delete-trip') {
       if (confirm('Excluir esta viagem? Os lançamentos vinculados serão mantidos sem vínculo.')) {
-        commit((draft) => {
-          draft.trips = draft.trips.filter((item) => item.id !== id);
-          draft.finances.forEach((finance) => { if (finance.tripId === id) finance.tripId = null; });
-          draft.checklist.forEach((item) => { if (item.tripId === id) item.tripId = null; });
-        }, 'Viagem excluída');
+        await invokeUi('travel.trip.delete', { id });
       }
       return;
     }
     if (action === 'edit-goal') return editGoal(id);
     if (action === 'delete-goal') {
-      if (confirm('Excluir esta meta?')) commit((draft) => { draft.goals = draft.goals.filter((item) => item.id !== id); }, 'Meta excluída');
+      if (confirm('Excluir esta meta?')) await invokeUi('finance.goal.delete', { id });
       return;
     }
     if (action === 'fund-goal') {
-      const value = parseMoney(prompt('Quanto deseja adicionar à meta?') || '');
+      const raw = prompt('Quanto deseja adicionar à meta?');
+      if (raw == null) return;
+      const value = parseMoney(raw || '');
       if (!Number.isFinite(value) || value <= 0) return toast('Valor inválido', 'Informe um valor maior que zero.', 'error');
-      commit((draft) => {
-        const goal = draft.goals.find((item) => item.id === id);
-        if (!goal) throw entityConflict('Esta meta foi removida em outra aba.');
-        const nextCents = Math.round(goal.current * 100) + Math.round(value * 100);
-        if (!Number.isSafeInteger(nextCents) || nextCents > Core.MAX_AMOUNT * 100) {
-          throw new Error(`O total da meta não pode ultrapassar ${money(Core.MAX_AMOUNT)}.`);
-        }
-        goal.current = nextCents / 100;
-      }, 'Valor adicionado à meta');
+      await invokeUi('finance.goal.fund', { id, amount: value });
       return;
     }
     if (action === 'edit-check') return editChecklist(id);
     if (action === 'toggle-check') {
-      commit((draft) => {
-        const item = draft.checklist.find((candidate) => candidate.id === id);
-        if (item) item.done = !item.done;
-      });
+      await invokeUi('planner.checklist.toggle', { id });
       return;
     }
     if (action === 'delete-check') {
-      commit((draft) => { draft.checklist = draft.checklist.filter((item) => item.id !== id); }, 'Item removido');
+      await invokeUi('planner.checklist.delete', { id });
       return;
     }
     if (action === 'vote') {
@@ -1132,30 +1213,24 @@
       const optionId = element.dataset.optionId;
       const voterId = state.voterByDecision[decisionId];
       if (!voterId) return toast('Escolha quem está votando', 'Adicione ou selecione um participante.', 'error');
-      const changed = await commit((draft) => {
-        const result = Core.vote(draft, decisionId, optionId, voterId);
-        return result.changed ? result.workspace : draft;
-      }, 'Voto atualizado');
-      return changed;
+      const result = await invokeUi('planner.decision.vote', { decisionId, optionId, participantId: voterId });
+      return result.ok;
     }
     if (action === 'toggle-decision') {
-      commit((draft) => {
-        const decision = draft.decisions.find((item) => item.id === id);
-        if (!decision) return;
-        decision.status = decision.status === 'open' ? 'closed' : 'open';
-        decision.closedAt = decision.status === 'closed' ? new Date().toISOString() : null;
-      }, 'Status da decisão atualizado');
+      const decision = state.workspace.decisions.find((item) => item.id === id);
+      if (!decision) return;
+      const skillId = decision.status === 'open' ? 'planner.decision.close' : 'planner.decision.reopen';
+      await invokeUi(skillId, { id });
       return;
     }
     if (action === 'delete-decision') {
-      if (confirm('Excluir esta decisão e todos os votos?')) commit((draft) => { draft.decisions = draft.decisions.filter((item) => item.id !== id); }, 'Decisão excluída');
+      if (confirm('Excluir esta decisão e todos os votos?')) await invokeUi('planner.decision.delete', { id });
       return;
     }
     if (action === 'toggle-participant') {
-      commit((draft) => {
-        const participant = draft.participants.find((item) => item.id === id);
-        if (participant) participant.active = !participant.active;
-      }, 'Participante atualizado');
+      const participant = state.workspace.participants.find((item) => item.id === id);
+      if (!participant) return;
+      await invokeUi('planner.participant.update', { id, active: !participant.active });
       return;
     }
     if (action === 'remove-participant') {
@@ -1165,14 +1240,13 @@
         ? 'Este participante possui histórico e será arquivado para preservar os registros.'
         : 'O participante será removido permanentemente. Continuar?';
       if (preview.archived || confirm(message)) {
-        const saved = await commit((draft) => Core.removeParticipant(draft, id).workspace,
-          preview.archived ? 'Participante arquivado' : 'Participante removido');
-        if (saved && preview.archived) toast('Histórico preservado', message);
+        const result = await invokeUi('planner.participant.remove', { id });
+        if (result.ok && preview.archived) toast('Histórico preservado', message);
       }
       return;
     }
     if (action === 'delete-budget') {
-      commit((draft) => { delete draft.budgets[id]; }, 'Limite removido');
+      await invokeUi('finance.budget.delete', { category: id });
     }
   }
 
@@ -1189,7 +1263,12 @@
       const button = event.currentTarget.querySelector('[type="submit"]');
       button.disabled = true;
       try {
-        const result = await Repository.auth.changePassword({ currentPassword, newPassword });
+        const outcome = await invokeUi('planner.account.password', { currentPassword, newPassword });
+        if (!outcome.ok) {
+          toast('Não foi possível alterar a senha', (outcome.error && outcome.error.message) || 'Revise a senha atual e a nova senha.', 'error');
+          return;
+        }
+        const result = outcome.value;
         state.account = result.account;
         state.workspace = result.workspace;
         state.sessionExpiresAt = result.expiresAt || state.sessionExpiresAt;
@@ -1197,8 +1276,6 @@
         closeDialog($('#security-dialog'));
         renderAll();
         toast('Senha alterada', 'As outras abas foram bloqueadas e o cofre foi recriptografado.', 'success');
-      } catch (error) {
-        toast('Não foi possível alterar a senha', error.message || 'Revise a senha atual e a nova senha.', 'error');
       } finally {
         button.disabled = false;
       }
@@ -1210,15 +1287,18 @@
       const button = event.currentTarget.querySelector('[type="submit"]');
       button.disabled = true;
       try {
-        state.workspace = await Repository.importBackup(state.pendingBackupSource, $('#backup-password').value);
+        const outcome = await invokeUi('planner.backup.import', { source: state.pendingBackupSource, password: $('#backup-password').value });
+        if (!outcome.ok) {
+          toast('Não foi possível abrir o backup', (outcome.error && outcome.error.message) || 'Senha ou arquivo inválido.', 'error');
+          return;
+        }
+        state.workspace = await Repository.load();
         state.pendingBackupSource = null;
         state.voterByDecision = {};
         event.currentTarget.reset();
         closeDialog($('#backup-password-dialog'));
         renderAll();
         toast('Backup restaurado', 'O conteúdo foi recriptografado com a conta atual.', 'success');
-      } catch (error) {
-        toast('Não foi possível abrir o backup', error.message || 'Senha ou arquivo inválido.', 'error');
       } finally {
         button.disabled = false;
       }
@@ -1232,7 +1312,7 @@
     $('#workspace-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const name = $('#workspace-name-input').value.trim();
-      await commit((draft) => { draft.name = name; }, name ? 'Nome do workspace atualizado' : 'Nome do workspace removido');
+      await invokeUi('planner.workspace.rename', { name });
     });
 
     $('#participant-form')?.addEventListener('submit', async (event) => {
@@ -1241,8 +1321,8 @@
       const name = $('#participant-name-input').value.trim();
       if (!name) return;
       const color = $('#participant-color-input').value;
-      const saved = await commit((draft) => { draft.participants.push(Core.createParticipant({ name, color }, draft.participants.length)); }, 'Participante adicionado');
-      if (!saved) return;
+      const result = await invokeUi('planner.participant.add', { name, color });
+      if (!result.ok) return;
       form.reset();
       $('#participant-color-input').value = Core.PALETTE[state.workspace.participants.length % Core.PALETTE.length];
     });
@@ -1253,57 +1333,32 @@
       const id = $('#transaction-id').value;
       const type = $('#transaction-type').value;
       const description = $('#transaction-description').value.trim();
-      const value = parseMoney($('#transaction-amount').value);
       const date = $('#transaction-date').value;
-      const splitBetweenIds = type === 'expense' ? $$('#transaction-split-options input:checked').map((input) => input.value) : [];
+      const splitBetweenIds = type === 'expense' ? $('#transaction-split-options input:checked').map((input) => input.value) : [];
+      // Mantém as mensagens originais de validação da UI antes de delegar à skill.
+      const value = parseMoney($('#transaction-amount').value);
       if (!description || !date || !Number.isFinite(value) || value <= 0) {
         return toast('Revise a transação', 'Descrição, data e valor maior que zero são obrigatórios.', 'error');
       }
       if (type === 'expense' && activeParticipants().length && !splitBetweenIds.length) {
         return toast('Escolha a divisão', 'Selecione ao menos um participante para esta despesa.', 'error');
       }
-      const existing = state.workspace.finances.find((item) => item.id === id);
-      const financeId = id || Core.id('finance');
-      const isOccurrence = Boolean(existing && existing.recurringSourceId);
-      const recurring = isOccurrence ? false : $('#transaction-recurring').checked;
-      const finance = {
-        id: financeId,
+      const payload = {
         type,
         description,
-        amount: value,
+        amount: $('#transaction-amount').value,
         date,
         category: $('#transaction-category').value,
         paidById: $('#transaction-payer').value || null,
         splitBetweenIds,
         tripId: $('#transaction-trip').value || null,
         notes: $('#transaction-notes').value.trim(),
-        recurring,
-        recurringSourceId: existing?.recurringSourceId || null,
-        recurrenceSeriesId: isOccurrence
-          ? (existing?.recurrenceSeriesId || existing?.recurringSourceId)
-          : (recurring ? (existing?.recurrenceSeriesId || financeId) : null),
-        occurrenceMonth: existing?.occurrenceMonth || null,
-        recurrenceSkippedMonths: recurring ? (existing?.recurrenceSkippedMonths || []) : [],
-        createdAt: existing?.createdAt || new Date().toISOString(),
+        recurring: $('#transaction-recurring').checked,
       };
-      const saved = await commit((draft) => {
-        const index = draft.finances.findIndex((item) => item.id === finance.id);
-        if (id && index < 0) throw entityConflict('Esta transação foi removida em outra aba.');
-        if (draft.finances[index]?.recurring && !finance.recurring && !draft.finances[index]?.recurringSourceId) {
-          draft.finances.forEach((item) => {
-            if (item.recurringSourceId !== finance.id) return;
-            item.recurringSourceId = null;
-            item.recurrenceSeriesId = null;
-            item.occurrenceMonth = null;
-            item.recurrenceSkippedMonths = [];
-          });
-        }
-        if (index >= 0) draft.finances[index] = finance;
-        else draft.finances.push(finance);
-      }, id ? 'Transação atualizada' : 'Transação adicionada');
-      if (saved) {
-        state.workspace = await materializeRecurring(state.workspace);
-        renderAll();
+      let result;
+      if (id) result = await invokeUi('finance.transaction.update', { id, ...payload });
+      else result = await invokeUi('finance.transaction.create', payload);
+      if (result.ok) {
         closeDialog($('#transaction-dialog'));
         form.reset();
       }
@@ -1322,23 +1377,18 @@
       if (!Number.isFinite(budget) || !Number.isFinite(savedAmount)) {
         return toast('Valores inválidos', `Orçamento e valor reservado devem ficar entre zero e ${money(Core.MAX_AMOUNT)}.`, 'error');
       }
-      const existing = state.workspace.trips.find((item) => item.id === id);
-      const trip = {
-        id: id || Core.id('trip'), destination,
+      const payload = {
+        destination,
         emoji: $('#trip-emoji').value.trim() || '🧭',
         startDate, endDate,
         budget,
         saved: savedAmount,
         notes: $('#trip-notes').value.trim(),
-        createdAt: existing?.createdAt || new Date().toISOString(),
       };
-      const saved = await commit((draft) => {
-        const index = draft.trips.findIndex((item) => item.id === trip.id);
-        if (id && index < 0) throw entityConflict('Esta viagem foi removida em outra aba.');
-        if (index >= 0) draft.trips[index] = trip;
-        else draft.trips.push(trip);
-      }, id ? 'Viagem atualizada' : 'Viagem planejada');
-      if (saved) closeDialog($('#trip-dialog'));
+      let result;
+      if (id) result = await invokeUi('travel.trip.update', { id, ...payload });
+      else result = await invokeUi('travel.trip.create', payload);
+      if (result.ok) closeDialog($('#trip-dialog'));
     });
 
     $('#goal-form')?.addEventListener('submit', async (event) => {
@@ -1350,21 +1400,17 @@
       if (!title || !Number.isFinite(target) || target <= 0 || !Number.isFinite(current)) {
         return toast('Revise a meta', `Título e valores entre zero e ${money(Core.MAX_AMOUNT)} são obrigatórios.`, 'error');
       }
-      const existing = state.workspace.goals.find((item) => item.id === id);
-      const goal = {
-        id: id || Core.id('goal'), title,
-        emoji: $('#goal-emoji').value.trim() || '🎯', target, current,
+      const payload = {
+        title,
+        emoji: $('#goal-emoji').value.trim() || '🎯',
+        target, current,
         deadline: $('#goal-deadline').value,
         description: $('#goal-description').value.trim(),
-        createdAt: existing?.createdAt || new Date().toISOString(),
       };
-      const saved = await commit((draft) => {
-        const index = draft.goals.findIndex((item) => item.id === goal.id);
-        if (id && index < 0) throw entityConflict('Esta meta foi removida em outra aba.');
-        if (index >= 0) draft.goals[index] = goal;
-        else draft.goals.push(goal);
-      }, id ? 'Meta atualizada' : 'Meta criada');
-      if (saved) closeDialog($('#goal-dialog'));
+      let result;
+      if (id) result = await invokeUi('finance.goal.update', { id, ...payload });
+      else result = await invokeUi('finance.goal.create', payload);
+      if (result.ok) closeDialog($('#goal-dialog'));
     });
 
     $('#checklist-form')?.addEventListener('submit', async (event) => {
@@ -1372,22 +1418,15 @@
       const id = $('#checklist-id').value;
       const text = $('#checklist-text').value.trim();
       if (!text) return;
-      const existing = state.workspace.checklist.find((item) => item.id === id);
-      const item = {
-        id: id || Core.id('check'),
+      const payload = {
         text,
         category: $('#checklist-category').value,
-        done: existing?.done || false,
         tripId: $('#checklist-trip').value || null,
-        createdAt: existing?.createdAt || new Date().toISOString(),
       };
-      const saved = await commit((draft) => {
-        const index = draft.checklist.findIndex((candidate) => candidate.id === item.id);
-        if (id && index < 0) throw entityConflict('Este item foi removido em outra aba.');
-        if (index >= 0) draft.checklist[index] = item;
-        else draft.checklist.push(item);
-      }, id ? 'Item atualizado' : 'Item adicionado');
-      if (saved) closeDialog($('#checklist-dialog'));
+      let result;
+      if (id) result = await invokeUi('planner.checklist.update', { id, ...payload });
+      else result = await invokeUi('planner.checklist.add', payload);
+      if (result.ok) closeDialog($('#checklist-dialog'));
     });
 
     $('#decision-form')?.addEventListener('submit', async (event) => {
@@ -1401,14 +1440,12 @@
         return true;
       });
       if (!title || options.length < 2) return toast('Revise a decisão', 'Informe um título e pelo menos duas opções diferentes.', 'error');
-      const saved = await commit((draft) => draft.decisions.unshift({
-        id: Core.id('decision'), title,
+      const result = await invokeUi('planner.decision.create', {
+        title,
         description: $('#decision-description').value.trim(),
-        status: 'open',
-        options: options.map((label) => ({ id: Core.id('option'), label, voterIds: [] })),
-        createdAt: new Date().toISOString(), closedAt: null,
-      }), 'Decisão criada');
-      if (saved) closeDialog($('#decision-dialog'));
+        options,
+      });
+      if (result.ok) closeDialog($('#decision-dialog'));
     });
 
     $('#budget-form')?.addEventListener('submit', async (event) => {
@@ -1416,28 +1453,16 @@
       const value = parseMoney($('#budget-amount').value);
       if (!Number.isFinite(value) || value <= 0) return toast('Valor inválido', 'Informe um limite maior que zero.', 'error');
       const category = $('#budget-category').value;
-      const saved = await commit((draft) => { draft.budgets[category] = value; }, 'Limite mensal salvo');
-      if (saved) closeDialog($('#budget-dialog'));
+      const result = await invokeUi('finance.budget.set', { category, amount: $('#budget-amount').value });
+      if (result.ok) closeDialog($('#budget-dialog'));
     });
 
     $('#setup-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const name = $('#setup-workspace-name').value.trim();
       const participantNames = $('#setup-participants').value.split('\n').map((item) => item.trim()).filter(Boolean);
-      const saved = await commit((draft) => {
-        draft.name = name;
-        draft.settings.onboardingCompleted = true;
-        const existing = new Set(draft.participants.map((participant) => participant.name.toLocaleLowerCase('pt-BR')));
-        participantNames.forEach((participantName) => {
-          if (existing.has(participantName.toLocaleLowerCase('pt-BR'))) return;
-          draft.participants.push(Core.createParticipant({
-            name: participantName,
-            color: Core.PALETTE[draft.participants.length % Core.PALETTE.length],
-          }, draft.participants.length));
-          existing.add(participantName.toLocaleLowerCase('pt-BR'));
-        });
-      }, 'Workspace configurado');
-      if (saved) closeDialog($('#setup-dialog'));
+      const result = await invokeUi('planner.workspace.setup', { name, participantNames });
+      if (result.ok) closeDialog($('#setup-dialog'));
     });
   }
 
@@ -1510,19 +1535,13 @@
         const name = event.target.value.trim();
         const id = event.target.dataset.participantName;
         if (!name) return renderSettings();
-        commit((draft) => {
-          const participant = draft.participants.find((item) => item.id === id);
-          if (participant) participant.name = name;
-        }, 'Nome atualizado');
+        invokeUi('planner.participant.update', { id, name });
         return;
       }
       if (event.target.matches('[data-participant-color]')) {
         const color = event.target.value;
         const id = event.target.dataset.participantColor;
-        commit((draft) => {
-          const participant = draft.participants.find((item) => item.id === id);
-          if (participant) participant.color = color;
-        });
+        invokeUi('planner.participant.update', { id, color });
       }
     });
 
@@ -1533,9 +1552,9 @@
       try {
         const source = await file.text();
         if (!confirm('Importar este backup? O workspace atual será substituído dentro do cofre.')) return;
-        try {
-          state.workspace = await Repository.importBackup(source);
-        } catch (error) {
+        const outcome = await invokeUi('planner.backup.import', { source });
+        if (!outcome.ok) {
+          const error = outcome.error;
           if (error && error.code === 'vault/backup-password-required') {
             state.pendingBackupSource = source;
             $('#backup-password-form')?.reset();
@@ -1543,8 +1562,10 @@
             toast('Senha do backup necessária', 'Informe a senha usada quando esse arquivo foi criado.');
             return;
           }
-          throw error;
+          toast('Falha ao importar', (error && error.message) || 'Arquivo inválido.', 'error');
+          return;
         }
+        state.workspace = await Repository.load();
         state.voterByDecision = {};
         renderAll();
         toast('Backup restaurado', 'Os dados foram validados e recriptografados com a conta atual.', 'success');
@@ -1608,6 +1629,7 @@
       applyTheme(theme);
       state.workspace = await Repository.initialize();
       state.workspace = await materializeRecurring(state.workspace);
+      state.runtime = createSkillRuntime();
       bindEvents();
       renderAll();
       state.unsubscribe = Repository.subscribe((workspace) => {
@@ -1665,6 +1687,7 @@
     navigate,
     render: renderAll,
     travelSearch: Travel,
+    get skills() { return state.runtime; },
   });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
