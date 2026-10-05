@@ -516,7 +516,7 @@
     const workspaceName = state.workspace.name || 'Workspace local';
     const accountName = state.account?.name || 'Conta local';
     setText('#sidebar-account-name', accountName);
-    setText('#sidebar-account-email', state.account?.email || 'Cofre desbloqueado');
+    setText('#sidebar-account-email', state.account?.email || 'Conectado');
     setText('#sidebar-account-avatar', initials(accountName));
     setText('#security-account-name', accountName);
     setText('#security-account-email', state.account?.email || '');
@@ -905,16 +905,55 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function isDrawerMode() {
+    return window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  function sidebarFocusables() {
+    const sidebar = $('#sidebar');
+    if (!sidebar) return [];
+    return Array.from(sidebar.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+      .filter((el) => el.offsetParent !== null || el === document.activeElement);
+  }
+
+  function trapSidebarFocus(event) {
+    if (event.key !== 'Tab') return;
+    if (!$('#sidebar')?.classList.contains('open')) return;
+    const focusables = sidebarFocusables();
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !$('#sidebar')?.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function openSidebar() {
     $('#sidebar')?.classList.add('open');
     $('#sidebar-backdrop')?.classList.add('open');
     $('[data-action="open-sidebar"]')?.setAttribute('aria-expanded', 'true');
+    if (isDrawerMode()) {
+      document.addEventListener('keydown', trapSidebarFocus, true);
+      const focusables = sidebarFocusables();
+      if (focusables.length) focusables[0].focus();
+    }
   }
 
   function closeSidebar() {
+    const wasOpen = $('#sidebar')?.classList.contains('open');
     $('#sidebar')?.classList.remove('open');
     $('#sidebar-backdrop')?.classList.remove('open');
-    $('[data-action="open-sidebar"]')?.setAttribute('aria-expanded', 'false');
+    const trigger = $('[data-action="open-sidebar"]');
+    trigger?.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('keydown', trapSidebarFocus, true);
+    if (wasOpen && isDrawerMode() && trigger && typeof trigger.focus === 'function') {
+      try { trigger.focus(); } catch (_) {}
+    }
   }
 
   function applyTheme(theme) {
@@ -1082,11 +1121,11 @@
   async function exportBackup() {
     const result = await invokeUi('planner.backup.export', {});
     if (!result.ok) {
-      toast('Falha no backup', (result.error && result.error.message) || 'Não foi possível exportar o cofre.', 'error');
+      toast('Falha no backup', (result.error && result.error.message) || 'Não foi possível exportar seus dados.', 'error');
       return;
     }
-    download(`plannerduo-cofre-${today()}.json`, result.value.encrypted, 'application/json');
-    toast('Backup criptografado concluído', 'O arquivo continua protegido pela senha do cofre.', 'success');
+    download(`plannerduo-backup-${today()}.json`, result.value.encrypted, 'application/json');
+    toast('Backup concluído', 'O arquivo continua protegido pela sua senha.', 'success');
   }
 
   async function applyChecklistTemplate() {
@@ -1140,10 +1179,10 @@
       return;
     }
     if (action === 'discard-legacy-conflict') {
-      if (!confirm('Descartar definitivamente a cópia legível conflitante? O cofre criptografado será mantido.')) return;
+      if (!confirm('Descartar definitivamente a cópia legível conflitante? Seus dados protegidos serão mantidos.')) return;
       await Repository.auth.discardLegacyConflict();
       renderSettings();
-      toast('Cópia legível descartada', 'Somente o cofre criptografado permanece.', 'success');
+      toast('Cópia legível descartada', 'Somente seus dados protegidos permanecem.', 'success');
       return;
     }
     if (action === 'choose-import') return $('#backup-file-input')?.click();
@@ -1275,7 +1314,7 @@
         event.currentTarget.reset();
         closeDialog($('#security-dialog'));
         renderAll();
-        toast('Senha alterada', 'As outras abas foram bloqueadas e o cofre foi recriptografado.', 'success');
+        toast('Senha alterada', 'As outras abas foram bloqueadas e seus dados foram recriptografados.', 'success');
       } finally {
         button.disabled = false;
       }
@@ -1551,7 +1590,7 @@
       if (!file) return;
       try {
         const source = await file.text();
-        if (!confirm('Importar este backup? O workspace atual será substituído dentro do cofre.')) return;
+        if (!confirm('Importar este backup? O conteúdo atual será substituído.')) return;
         const outcome = await invokeUi('planner.backup.import', { source });
         if (!outcome.ok) {
           const error = outcome.error;
@@ -1621,10 +1660,10 @@
       }
       state.account = restoredSession.account;
       state.sessionExpiresAt = restoredSession.expiresAt || 0;
-      let theme = 'light';
+      let theme = 'dark';
       try {
         theme = localStorage.getItem(Repository.THEME_KEY)
-          || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
       } catch (_) {}
       applyTheme(theme);
       state.workspace = await Repository.initialize();
@@ -1641,7 +1680,7 @@
         lockVault({ allTabs: false });
       }, () => {
         renderSettings();
-        toast('Cópia legível detectada', 'Uma aba antiga gravou dados fora do cofre. Baixe e revise a cópia em Configurações.', 'error');
+        toast('Cópia legível detectada', 'Uma aba antiga gravou dados sem proteção. Baixe e revise a cópia em Configurações.', 'error');
       });
       setupAutoLock();
       const shell = $('#app-shell');

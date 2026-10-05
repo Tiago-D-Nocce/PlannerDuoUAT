@@ -176,7 +176,7 @@
       // 1) resposta curta a uma pergunta pendente?
       const pending = state.memory.pending;
       if (pending && isBareAnswer(t)) {
-        const filled = fillPendingSlot(turn, pending, t);
+        const filled = await fillPendingSlot(turn, pending, t);
         if (filled) return; // continuou o fluxo (plano ou nova pergunta)
       }
 
@@ -223,15 +223,24 @@
     }
 
     // Roda os steps de um stage em paralelo; emite cada bloco assim que o step liquida.
+    // O stage liquida assim que todos os steps "bloqueantes" (escritas) terminam;
+    // leituras lentas (ex.: busca de voos) seguem ao fundo, ainda sujeitas à
+    // supersessão (runStep não emite nada de um turno superado). Assim 'handle'
+    // resolve cedo após emitir os blocos rápidos (ex.: links), sem travar num
+    // relógio falso que só avança depois do await.
     function runStage(turn, stage, parsed) {
       const steps = stage.steps || [];
       if (!steps.length) return Promise.resolve();
+      const blocking = steps.filter(function (step) { return step && step.write; });
       return new Promise(function (resolve) {
-        let remaining = steps.length;
+        let remaining = blocking.length;
         const done = function () { remaining -= 1; if (remaining <= 0) resolve(); };
         steps.forEach(function (step) {
-          runStep(turn, step, parsed).then(done, done);
+          const p = runStep(turn, step, parsed);
+          if (step && step.write) p.then(done, done);
+          else p.then(function () {}, function () {});
         });
+        if (remaining <= 0) resolve();
       });
     }
 
@@ -250,7 +259,7 @@
         result = await invokeOrThrow(step.skillId, step.input, turn);
       } catch (err) {
         if (turn.superseded) return;
-        handleStepError(turn, step, err);
+        handleStepError(turn, step, err, parsed);
         return;
       }
       if (turn.superseded) return;
@@ -269,10 +278,14 @@
       }
     }
 
-    function handleStepError(turn, step, err) {
+    function handleStepError(turn, step, err, parsed) {
       // skill/invalid-input vira pergunta a partir do primeiro field error.
       if (err && err.code === 'skill/invalid-input' && Array.isArray(err.fields) && err.fields.length) {
         const field = err.fields[0];
+        // registra pendência para que a próxima resposta curta preencha este slot.
+        if (parsed && parsed.intent) {
+          rememberPending(parsed, field.field);
+        }
         emitBlock(turn, makeBlock(turn, step.agent, 'question', {
           slot: field.field,
           prompt: field.message,
@@ -529,7 +542,7 @@
     }
 
     // Preenche o slot pendente a partir de uma resposta curta e continua o fluxo.
-    function fillPendingSlot(turn, pending, t) {
+    async function fillPendingSlot(turn, pending, t) {
       let value;
       try {
         value = typeof nlu.parseSlotValue === 'function'
@@ -548,8 +561,9 @@
         slots: slots,
         missing: recomputeMissing(pending.intent, slots),
       };
-      // continua o mesmo intent (plano ou nova pergunta).
-      planAndRun(turn, parsed, t);
+      // continua o mesmo intent (plano ou nova pergunta); aguarda para que o
+      // 'handle' só resolva depois do recibo/pergunta de follow-up.
+      await planAndRun(turn, parsed, t);
       return true;
     }
 
@@ -985,6 +999,7 @@
     const err = new Error(message);
     err.code = 'skill/failed';
     err.retryable = false;
+    err.publicMessage = message;
     return err;
   }
 

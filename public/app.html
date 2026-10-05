@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR" data-theme="light">
+<html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,7 +14,7 @@
 
   <div id="app-loading" class="app-loading" role="status" aria-live="polite">
     <div class="loading-mark" aria-hidden="true">P</div>
-    <strong>Abrindo seu cofre local</strong>
+    <strong>Abrindo seu espaço</strong>
     <span>Validando a sessão e descriptografando os dados.</span>
   </div>
 
@@ -30,31 +30,31 @@
         <div class="workspace-mini-icon" id="workspace-mini-icon">✦</div>
         <div class="workspace-mini-copy">
           <strong id="sidebar-workspace-name">Meu workspace</strong>
-          <span><i class="status-dot"></i> cofre criptografado</span>
+          <span><i class="status-dot"></i> dados protegidos</span>
         </div>
       </div>
       <div class="sidebar-account" id="sidebar-account">
         <span class="sidebar-account-avatar" id="sidebar-account-avatar">?</span>
-        <div><strong id="sidebar-account-name">Conta local</strong><small id="sidebar-account-email">Cofre desbloqueado</small></div>
+        <div><strong id="sidebar-account-name">Conta local</strong><small id="sidebar-account-email">Conectado</small></div>
       </div>
       <div class="participant-stack" id="sidebar-participants" aria-label="Participantes"></div>
 
       <nav class="nav-list">
         <span class="nav-label">Planejar</span>
-        <button class="nav-item active" type="button" data-view="dashboard"><span>⌂</span>Visão geral</button>
-        <button class="nav-item" type="button" data-view="finances"><span>↕</span>Finanças <b id="nav-finance-count" hidden>0</b></button>
-        <button class="nav-item" type="button" data-view="trips"><span>⌁</span>Viagens</button>
-        <button class="nav-item" type="button" data-view="goals"><span>◎</span>Metas</button>
-        <button class="nav-item" type="button" data-view="checklist"><span>✓</span>Checklist</button>
-        <button class="nav-item" type="button" data-view="decisions"><span>◇</span>Decisões <b id="nav-decision-count" hidden>0</b></button>
+        <button class="nav-item active" type="button" data-view="dashboard"><span aria-hidden="true">⌂</span>Visão geral</button>
+        <button class="nav-item" type="button" data-view="finances"><span aria-hidden="true">↕</span>Finanças <b id="nav-finance-count" hidden>0</b></button>
+        <button class="nav-item" type="button" data-view="trips"><span aria-hidden="true">⌁</span>Viagens</button>
+        <button class="nav-item" type="button" data-view="goals"><span aria-hidden="true">◎</span>Metas</button>
+        <button class="nav-item" type="button" data-view="checklist"><span aria-hidden="true">✓</span>Checklist</button>
+        <button class="nav-item" type="button" data-view="decisions"><span aria-hidden="true">◇</span>Decisões <b id="nav-decision-count" hidden>0</b></button>
         <span class="nav-label">Analisar</span>
-        <button class="nav-item" type="button" data-view="reports"><span>▥</span>Relatórios</button>
-        <button class="nav-item" type="button" data-view="settings"><span>⚙</span>Configurações</button>
+        <button class="nav-item" type="button" data-view="reports"><span aria-hidden="true">▥</span>Relatórios</button>
+        <button class="nav-item" type="button" data-view="settings"><span aria-hidden="true">⚙</span>Configurações</button>
       </nav>
 
       <div class="sidebar-footer">
         <button class="icon-button dark" type="button" data-action="toggle-theme" aria-label="Alternar tema" title="Alternar tema"><span id="theme-icon">◐</span></button>
-        <div class="local-badge"><span>●</span> Cofre aberto</div>
+        <div class="local-badge"><span>●</span> Online</div>
         <button class="icon-button dark" type="button" data-action="lock-vault" aria-label="Bloquear e sair" title="Bloquear e sair">⌑</button>
       </div>
     </aside>
@@ -86,10 +86,10 @@
           <div class="participant-ribbon" id="dashboard-participants"></div>
 
           <div class="metric-grid">
-            <article class="metric-card tone-green"><span class="metric-icon">↗</span><div><small>Receitas no mês</small><strong id="metric-income">R$ 0,00</strong><em id="metric-income-note">Nenhum lançamento</em></div></article>
-            <article class="metric-card tone-red"><span class="metric-icon">↘</span><div><small>Despesas no mês</small><strong id="metric-expense">R$ 0,00</strong><em id="metric-expense-note">Nenhum lançamento</em></div></article>
-            <article class="metric-card tone-blue"><span class="metric-icon">≈</span><div><small>Saldo no mês</small><strong id="metric-balance">R$ 0,00</strong><em>Receitas menos despesas</em></div></article>
-            <article class="metric-card tone-purple"><span class="metric-icon">◇</span><div><small>Decisões abertas</small><strong id="metric-decisions">0</strong><em id="metric-decisions-note">Tudo decidido</em></div></article>
+            <article class="metric-card tone-green"><span class="metric-icon" aria-hidden="true">↗</span><div><small>Receitas no mês</small><strong id="metric-income">R$ 0,00</strong><em id="metric-income-note">Nenhum lançamento</em></div></article>
+            <article class="metric-card tone-red"><span class="metric-icon" aria-hidden="true">↘</span><div><small>Despesas no mês</small><strong id="metric-expense">R$ 0,00</strong><em id="metric-expense-note">Nenhum lançamento</em></div></article>
+            <article class="metric-card tone-blue"><span class="metric-icon" aria-hidden="true">≈</span><div><small>Saldo no mês</small><strong id="metric-balance">R$ 0,00</strong><em>Receitas menos despesas</em></div></article>
+            <article class="metric-card tone-purple"><span class="metric-icon" aria-hidden="true">◇</span><div><small>Decisões abertas</small><strong id="metric-decisions">0</strong><em id="metric-decisions-note">Tudo decidido</em></div></article>
           </div>
 
           <div class="dashboard-grid">
@@ -221,21 +221,21 @@
               <form id="participant-form" class="participant-add-form"><input id="participant-name-input" maxlength="40" placeholder="Nome do participante" aria-label="Nome do novo participante" required><input id="participant-color-input" type="color" value="#6366f1" aria-label="Cor do participante"><button class="button primary" type="submit">Adicionar</button></form>
             </article>
             <article class="panel security-card">
-              <div class="panel-heading"><div><span class="eyebrow">CONTA E SEGURANÇA</span><h2>Cofre local</h2></div><span class="privacy-icon">⌗</span></div>
+              <div class="panel-heading"><div><span class="eyebrow">CONTA E SEGURANÇA</span><h2>Conta e segurança</h2></div><span class="privacy-icon" aria-hidden="true">⌗</span></div>
               <div class="security-account-summary"><span id="security-account-avatar" aria-hidden="true">⌾</span><div><strong id="security-account-name">Conta local</strong><small id="security-account-email"></small></div><span class="security-state">Protegido</span></div>
               <p class="panel-description">AES-GCM protege o conteúdo em repouso. A sessão desta aba bloqueia automaticamente após 30 minutos sem atividade.</p>
               <div class="button-row"><button class="button ghost" type="button" data-action="open-security">Alterar senha</button><button class="button ghost" type="button" data-action="lock-vault">Bloquear agora</button></div>
               <div class="legacy-conflict" id="legacy-conflict" hidden><strong>Cópia legível detectada</strong><span>Uma aba antiga gravou dados após a migração. Baixe e confira antes de descartar.</span><div class="button-row"><button class="button ghost small" type="button" data-action="export-legacy-conflict">Baixar cópia</button><button class="button danger small" type="button" data-action="discard-legacy-conflict">Descartar cópia</button></div></div>
             </article>
             <article class="panel privacy-card">
-              <div class="panel-heading"><div><span class="eyebrow">PRIVACIDADE LOCAL</span><h2>Criptografado neste navegador</h2></div><span class="privacy-icon">◉</span></div>
+              <div class="panel-heading"><div><span class="eyebrow">PRIVACIDADE LOCAL</span><h2>Criptografado neste navegador</h2></div><span class="privacy-icon" aria-hidden="true">◉</span></div>
               <p>Não há nuvem nem recuperação por e-mail. O conteúdo só é legível enquanto esta aba possui uma sessão desbloqueada.</p>
               <dl id="data-summary"></dl>
             </article>
             <article class="panel">
               <div class="panel-heading"><div><span class="eyebrow">PORTABILIDADE SEGURA</span><h2>Backup e restauração</h2></div></div>
               <p class="panel-description">O backup padrão permanece criptografado e exige a senha usada quando foi criado. A importação também aceita o JSON legível antigo após confirmação.</p>
-              <div class="button-row"><button class="button ghost" type="button" data-action="export-backup">Baixar cofre criptografado</button><button class="button ghost" type="button" data-action="choose-import">Importar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div>
+              <div class="button-row"><button class="button ghost" type="button" data-action="export-backup">Baixar backup</button><button class="button ghost" type="button" data-action="choose-import">Importar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div>
               <div class="danger-zone"><div><strong>Recomeçar mantendo a conta</strong><span>Apaga o conteúdo do workspace, mas preserva e-mail, senha e criptografia.</span></div><button class="button danger" type="button" data-action="reset-workspace">Apagar dados locais</button></div>
             </article>
           </div>
@@ -283,9 +283,9 @@
     <form id="setup-form"><div class="setup-visual" aria-hidden="true"><span>✦</span><i></i><i></i></div><div class="dialog-header"><div><span class="eyebrow">COMECE EM BRANCO</span><h2>Monte seu workspace</h2><p>Não há perfis predefinidos. Você decide o nome e quem participa.</p></div><button class="dialog-close" type="button" data-action="dismiss-setup" aria-label="Fechar">×</button></div><label><span>Nome do workspace <em>opcional</em></span><input id="setup-workspace-name" maxlength="60" placeholder="Dê um nome ao seu espaço"></label><label><span>Participantes <em>opcional</em></span><textarea id="setup-participants" rows="4" placeholder="Digite um nome por linha"></textarea><small class="form-help">Você pode adicionar, renomear ou arquivar participantes depois.</small></label><div class="dialog-actions"><button class="button ghost" type="button" data-action="dismiss-setup">Decidir depois</button><button class="button primary" type="submit">Criar meu espaço</button></div></form>
   </dialog>
 
-  <dialog id="security-dialog" class="dialog small-dialog" aria-label="Alterar senha do cofre">
+  <dialog id="security-dialog" class="dialog small-dialog" aria-label="Alterar senha">
     <form id="security-form">
-      <div class="dialog-header"><div><span class="eyebrow">SEGURANÇA</span><h2>Alterar senha do cofre</h2><p>Todo o conteúdo será recriptografado e as outras abas serão bloqueadas.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
+      <div class="dialog-header"><div><span class="eyebrow">SEGURANÇA</span><h2>Alterar senha</h2><p>Todo o conteúdo será recriptografado e as outras abas serão bloqueadas.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
       <label><span>Senha atual</span><input id="security-current-password" type="password" autocomplete="current-password" maxlength="128" required></label>
       <label><span>Nova senha</span><input id="security-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
       <label><span>Confirme a nova senha</span><input id="security-confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
@@ -296,7 +296,7 @@
 
   <dialog id="backup-password-dialog" class="dialog small-dialog" aria-label="Senha do backup">
     <form id="backup-password-form">
-      <div class="dialog-header"><div><span class="eyebrow">BACKUP PROTEGIDO</span><h2>Desbloquear arquivo</h2><p>Use a senha que protegia o cofre quando este backup foi criado.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
+      <div class="dialog-header"><div><span class="eyebrow">BACKUP PROTEGIDO</span><h2>Desbloquear arquivo</h2><p>Use a senha definida quando este backup foi criado.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
       <label><span>Senha do backup</span><input id="backup-password" type="password" autocomplete="off" maxlength="128" required></label>
       <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Validar e importar</button></div>
     </form>

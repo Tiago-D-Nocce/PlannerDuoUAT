@@ -73,7 +73,7 @@ function harness(custom) {
 
   // reais: finanças e planner (recibos com before/after para undo).
   financeSkills.register(runtime);
-  plannerSkills.register(runtime);
+  if (!cfg.skipPlanner) plannerSkills.register(runtime);
 
   // falsas: links de viagem (rápido).
   runtime.define({
@@ -209,9 +209,8 @@ describe('PlannerOrchestrator — follow-ups', () => {
 
 describe('PlannerOrchestrator — erros', () => {
   it('erro de skill vira bloco error sem stack nem corpo upstream', async () => {
-    const h = harness();
-    // decisão listar falha propositalmente.
-    h.runtime.reset();
+    // sem planner real: definimos uma decisão.list que falha propositalmente.
+    const h = harness({ skipPlanner: true });
     h.runtime.define({
       id: 'planner.decision.list', agent: 'planner', kind: 'read', exposure: ['chat', 'ui'], timeoutMs: 500,
       title: 'Decisões', validate: () => kit.ok({ filter: 'all' }),
