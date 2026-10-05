@@ -167,7 +167,7 @@ Invariantes de todas as tarefas: formato `plannerduo-vault`, chave `plannerduo:v
     - _Requirements: 2.6, 2.9, 2.18_
   - [ ] 16.3 Escrever `tests/assets/provider-icons.test.js`: entradas únicas e coerentes com `PlannerTravel`, `sha256` de 64 hex igual aos bytes servidos pelo `app-server`, mutação de um byte reprovada, tipos e tamanhos válidos, SVG ativo rejeitado e nenhuma URL externa de asset
     - _Requirements: 2.6, 2.19, 2.20_
-- [ ] 17. Checkpoint da Etapa 3
+- [x] 17. Checkpoint da Etapa 3
   - Garantir que todos os testes passem e perguntar ao usuário se surgirem dúvidas. Gate: matriz de 14.3 nos dois temas coberta pelos testes de DOM e de auditoria, zero “cofre” ou “vault” visível e criação de conta sem erro genérico; `npm test` e, por último, `npm run verificar`, ambos verdes antes da Etapa 4
   - _Requirements: 2.1, 2.7–2.15, 3.6–3.10_
 

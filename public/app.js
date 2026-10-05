@@ -717,9 +717,37 @@
     }).join('');
   }
 
+  // Icones locais reais dos provedores (gerados por scripts/fetch-provider-icons.mjs).
+  // O manifesto e carregado como MODULO LOCAL (assets/providers/manifest.js via <script src>,
+  // permitido por script-src 'self') e exposto em globalThis.PlannerProviderIcons. Lemos de forma
+  // sincrona do global — nenhum fetch/XHR, respeitando o CSP connect-src 'none'.
+  let travelIconManifest = null; // Map providerId -> entry, ou null enquanto nao carregado
+  function loadTravelIconManifest() {
+    if (travelIconManifest) return travelIconManifest;
+    const map = new Map();
+    const source = (typeof globalThis !== 'undefined' && globalThis.PlannerProviderIcons) || null;
+    const entries = source && Array.isArray(source.entries) ? source.entries : [];
+    for (const entry of entries) {
+      if (entry && typeof entry.providerId === 'string' && typeof entry.file === 'string') {
+        map.set(entry.providerId, entry);
+      }
+    }
+    travelIconManifest = map;
+    return travelIconManifest;
+  }
+  function travelProviderIcon(provider) {
+    const entry = travelIconManifest && travelIconManifest.get(provider.id);
+    if (entry) {
+      const dims = (entry.width && entry.height) ? ` width="${Number(entry.width)}" height="${Number(entry.height)}"` : '';
+      return `<img class="travel-provider-img" src="assets/providers/${escapeHtml(entry.file)}" alt="" aria-hidden="true" loading="lazy"${dims}>`;
+    }
+    // Sem ícone local: nunca um monograma/letra fabricada nem look-alike de terceiro; só um ponto de accent neutro.
+    return '<span class="travel-provider-swatch" aria-hidden="true"></span>';
+  }
   function renderTravelProviders() {
     const container = $('#travel-provider-grid');
     if (!container || !Travel) return;
+    if (!travelIconManifest) loadTravelIconManifest();
     setText('#travel-provider-count', `${TRAVEL_PROVIDERS.length} provedores`);
     $$('[data-travel-provider-filter]').forEach((button) => {
       const active = button.dataset.travelProviderFilter === state.travelProviderFilter;
@@ -731,7 +759,7 @@
     ));
     container.innerHTML = providers.map((provider) => `
       <button class="travel-provider-card" style="--provider-accent:${provider.accent}" type="button" data-action="search-provider" data-provider="${escapeHtml(provider.id)}" aria-label="Pesquisar no ${escapeHtml(provider.name)}">
-        <span class="travel-provider-logo" aria-hidden="true">${Travel.iconSvg(provider.id)}</span>
+        <span class="travel-provider-logo" aria-hidden="true">${travelProviderIcon(provider)}</span>
         <span class="travel-provider-copy"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.description)}</small><span class="travel-provider-tag ${provider.support}">${escapeHtml(Travel.badgeFor(provider))}</span></span>
         <span class="travel-provider-arrow" aria-hidden="true">↗</span>
       </button>`).join('');

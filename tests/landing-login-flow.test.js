@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import travel from '../public/travel.js';
-
 const PUBLIC = resolve(import.meta.dirname, '..', 'public');
 const read = (name) => readFileSync(resolve(PUBLIC, name), 'utf8');
 const landing = read('index.html');
@@ -12,7 +11,6 @@ const appScript = read('app.js');
 const authScript = read('auth.js');
 const localScript = read('local.js');
 const pages = [landing, app, auth].join('\n');
-
 describe('login e guarda do cofre', () => {
   it('encaminha todas as entradas públicas para a tela de login', () => {
     expect((landing.match(/href="auth\.html[^"]*"/g) || []).length).toBeGreaterThanOrEqual(3);
@@ -22,7 +20,6 @@ describe('login e guarda do cofre', () => {
     expect(auth).toContain('id="setup-vault-form"');
     expect(auth).toContain('type="password"');
   });
-
   it('protege o painel com sessão, logout e troca de senha', () => {
     expect(appScript).toContain('Repository.auth.restoreSession()');
     expect(appScript).toContain('redirectToLogin()');
@@ -33,7 +30,6 @@ describe('login e guarda do cofre', () => {
     expect(localScript).toContain("name: 'AES-GCM'");
     expect(localScript).toContain('600000');
   });
-
   it('carrega somente scripts e estilos locais', () => {
     expect(pages).not.toMatch(/(?:src|href)="https?:\/\//i);
     expect(pages).not.toMatch(/cdnjs|jsdelivr|gstatic|unpkg/i);
@@ -41,13 +37,11 @@ describe('login e guarda do cofre', () => {
     expect(app).toContain('<script src="travel.js"></script>');
     expect(app).toContain('<script src="app.js"></script>');
   });
-
   it('não contém papéis fixos de participantes', () => {
     expect([pages, appScript].join('\n')).not.toMatch(/Pessoa\s*[12]|\bp[12]\b|nome[12]/i);
     expect(app).toContain('Sem limite fixo');
   });
 });
-
 describe('registry multi-site e ícones locais', () => {
   it('oferece 26 provedores em quatro categorias', () => {
     expect(travel.providerIds).toHaveLength(26);
@@ -58,7 +52,6 @@ describe('registry multi-site e ícones locais', () => {
       'clickbus', 'buser', 'rome2rio', 'omio', 'localiza',
     ]));
   });
-
   it('renderiza um SVG local seguro para cada site', () => {
     travel.providerIds.forEach((providerId) => {
       const icon = travel.iconSvg(providerId);
@@ -69,13 +62,11 @@ describe('registry multi-site e ícones locais', () => {
     expect(travel.iconSvg('airbnb')).toContain('<path');
     expect(travel.iconSvg('azul')).toContain('<rect');
   });
-
   it('mantém todos os destinos em allowlist HTTPS exata', () => {
     expect(travel.allowedHosts).toHaveLength(25);
     travel.allowedHosts.forEach((host) => expect(host).toMatch(/^[a-z0-9.-]+$/));
   });
 });
-
 describe('datas estruturadas nos sites compatíveis', () => {
   const search = {
     origin: 'Belo Horizonte (CNF)',
@@ -85,7 +76,6 @@ describe('datas estruturadas nos sites compatíveis', () => {
     passengers: 2,
   };
   const referenceDate = '2026-09-28';
-
   it('valida rota, período, passageiros e diária de hospedagem', () => {
     expect(travel.validate('kayak', search, referenceDate).ok).toBe(true);
     expect(travel.validate('kayak', { ...search, origin: '---' }, referenceDate).ok).toBe(false);
@@ -93,7 +83,6 @@ describe('datas estruturadas nos sites compatíveis', () => {
     expect(travel.validate('airbnb', { ...search, returnDate: search.departure }, referenceDate).ok).toBe(false);
     expect(travel.validate('kayak', { ...search, returnDate: search.departure }, referenceDate).ok).toBe(true);
   });
-
   it.each([
     'kayak', 'skyscanner', 'momondo', 'kiwi', 'expedia-flights', 'decolar', 'latam',
     'airbnb', 'booking', 'expedia-hotels', 'hoteis', 'hostelworld', 'vrbo', 'clickbus', 'buser',
@@ -105,36 +94,30 @@ describe('datas estruturadas nos sites compatíveis', () => {
     const compactDeparture = search.departure.replace(/-/g, '').slice(2);
     expect(built.url.includes(search.departure) || built.url.includes(compactDeparture)).toBe(true);
   });
-
   it('transmite rota e passageiros nos principais comparadores', () => {
     const kayak = new URL(travel.build('kayak', search, referenceDate).url);
     expect(kayak.pathname).toContain('/CNF-GRU/2026-12-10/2026-12-15/2adults');
-
     const expedia = new URL(travel.build('expedia-flights', search, referenceDate).url);
     expect(expedia.searchParams.get('FromAirport')).toBe('CNF');
     expect(expedia.searchParams.get('ToAirport')).toBe('GRU');
     expect(expedia.searchParams.get('NumAdult')).toBe('2');
-
     const booking = new URL(travel.build('booking', search, referenceDate).url);
     expect(booking.searchParams.get('checkin')).toBe(search.departure);
     expect(booking.searchParams.get('checkout')).toBe(search.returnDate);
     expect(booking.searchParams.get('group_adults')).toBe('2');
   });
-
   it('identifica honestamente buscas assistidas e páginas manuais', () => {
     expect(travel.build('google-flights', search, referenceDate).mode).toBe('assisted');
     expect(travel.build('rome2rio', search, referenceDate).mode).toBe('assisted');
     ['gol', 'azul', 'agoda', 'trivago', 'omio', 'flixbus', 'busbud', 'localiza', 'booking-cars']
       .forEach((providerId) => expect(travel.build(providerId, search, referenceDate).mode).toBe('manual'));
   });
-
   it('faz fallback quando faltam requisitos de IATA ou período', () => {
     const withoutCodes = { ...search, origin: 'Belo Horizonte', destination: 'São Paulo' };
     expect(travel.build('kayak', withoutCodes, referenceDate).mode).toBe('manual');
     expect(travel.build('latam', withoutCodes, referenceDate).mode).toBe('manual');
     expect(travel.build('expedia-flights', { ...search, returnDate: '' }, referenceDate).mode).toBe('manual');
   });
-
   it('rejeita qualquer URL fora da allowlist pelo registry', () => {
     travel.providerIds.forEach((providerId) => {
       const built = travel.build(providerId, search, referenceDate);
@@ -147,24 +130,50 @@ describe('datas estruturadas nos sites compatíveis', () => {
     });
   });
 });
-
 describe('degradação honesta dos deep links', () => {
   const oneWay = {
     origin: 'Belo Horizonte (CNF)', destination: 'São Paulo (GRU)',
     departure: '2026-12-10', returnDate: '', passengers: 2,
   };
-
   it('não chama hospedagem sem checkout de busca exata', () => {
     ['airbnb', 'booking', 'hoteis', 'hostelworld', 'vrbo'].forEach((providerId) => {
       expect(travel.build(providerId, oneWay, '2026-09-28').mode).toBe('assisted');
     });
   });
-
   it('remove anotações IATA dos slugs rodoviários', () => {
     ['clickbus', 'buser'].forEach((providerId) => {
       const target = new URL(travel.build(providerId, oneWay, '2026-09-28').url);
       expect(target.pathname).toContain('belo-horizonte/sao-paulo');
       expect(target.pathname).not.toMatch(/cnf|gru/i);
     });
+  });
+});
+describe('mapa de erros de acesso sem jargão de implementação', () => {
+  const codes = [
+    ['vault/locks-unavailable', 'bloqueio seguro entre abas'],
+    ['vault/crypto-unavailable', 'localhost'],
+    ['local/storage-unavailable', 'Permita armazenamento local'],
+    ['vault/already-exists', 'Esta conta já existe neste navegador. Faça login.'],
+    ['local/write-failed', 'espaço suficiente'],
+    ['vault/invalid-credentials', 'E-mail ou senha incorretos.'],
+  ];
+  it('auth.js mapeia cada código conhecido para uma mensagem pt-BR específica', () => {
+    codes.forEach(([code, fragment]) => {
+      expect(authScript).toContain(`'${code}'`);
+      expect(authScript).toContain(fragment);
+    });
+  });
+  it('mantém o fallback genérico apenas para erros desconhecidos', () => {
+    expect(authScript).toContain('Não foi possível concluir a operação com segurança.');
+    expect(authScript).toContain('known[error && error.code] ||');
+  });
+  it('a copy de "conta já existe" foi rebatizada e não cita cofre', () => {
+    expect(authScript).not.toMatch(/cofre j[áa] existe/i);
+    expect(authScript).toContain('Esta conta já existe neste navegador. Faça login.');
+  });
+  it('todos os códigos de acesso mapeados em auth.js são emitidos por local.js', () => {
+    ['vault/locks-unavailable', 'vault/crypto-unavailable', 'local/storage-unavailable',
+      'vault/already-exists', 'local/write-failed', 'vault/invalid-credentials']
+      .forEach((code) => expect(localScript).toContain(`'${code}'`));
   });
 });
