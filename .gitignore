@@ -29,3 +29,6 @@ lib-cov/
 Thumbs.db
 # Smoke screenshots descartáveis (não versionar)
 verificacao-visual/
+
+# Scripts temporários de verificação
+tmp/
