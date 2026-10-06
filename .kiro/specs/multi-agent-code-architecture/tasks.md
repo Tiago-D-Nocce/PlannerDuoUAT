@@ -173,14 +173,14 @@ Invariantes de todas as tarefas: formato `plannerduo-vault`, chave `plannerduo:v
 
 ### Etapa 4: Integração
 
-- [ ] 18. Composição final, gate e README
-  - [ ] 18.1 Compor Central, orquestrador, runtime e `market-client` em `public/app.js` e `public/app.html`
+- [x] 18. Composição final, gate e README
+  - [x] 18.1 Compor Central, orquestrador, runtime e `market-client` em `public/app.js` e `public/app.html`
     - Módulos restantes de 7.12.3 carregados na ordem documentada; Central como tela inicial (`/app` abre `central`) com um `POST /api/status` ao abrir; bloquear, auto-lock ou sair chama `orchestrator.clear()` e `runtime.reset()` e descarta recibos, “Ver envio” e consentimento; `Ctrl+K`/`⌘K` e o botão “Comandos” abrem a paleta local (3.5); busca da view Viagens via `travel.*.search` e `travel.links.build`; Configurações → Integrações com `/api/status` (sem chaves) e opt-in da IA na sessão nomeando provedor, host e modelo. Pronto: 18.3 verde
     - _Requirements: 3.5, 5.1, 5.16, 5.21, 6.7, 6.15, 6.16_
   - [ ] 18.2 Atualizar `scripts/verificar-frontend.mjs` conforme 14.12–14.13 e o `README.md`
     - Gate: sintaxe de `public/modules/**`, CSP exata por página, `fetch(` só em `market-client.js` para os quatro paths, smoke HTTP das quatro rotas (`GET`/`OPTIONS` → 405 sem `Access-Control-*`, Host ou Origin inválidos → 403, `/api/status` sem configuração → nada disponível), varredura de chaves (`duffel_`, `sand_`/`sandbox_`/`prod_` + UUID e valores de `PLANNERDUO_DUFFEL_TOKEN`/`PLANNERDUO_LITEAPI_KEY`), proibição de `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, `eval` e `new Function` em `agents/**`, `skills/**` e `central-view.js`, manifesto de ícones e mensagem “sem dependências externas de runtime”; README: `npm run dev`, `.env.local` a partir de `.env.example` (Duffel test mode, LiteAPI sandbox e IA opcional), `node scripts/fetch-provider-icons.mjs`, `npm test` e `npm run verificar`
     - _Requirements: 6.13, 2.6, 2.20, 5.2_
-  - [ ] 18.3 Escrever `tests/integration/app-composition.test.js`: bloquear e sair limpam runtime, orquestrador e consentimento; a paleta abre e devolve o foco; view Viagens e chat produzem o mesmo resultado; IA desligada → zero chamadas a `/api/assistant/interpret`
+  - [x] 18.3 Escrever `tests/integration/app-composition.test.js`: bloquear e sair limpam runtime, orquestrador e consentimento; a paleta abre e devolve o foco; view Viagens e chat produzem o mesmo resultado; IA desligada → zero chamadas a `/api/assistant/interpret`
     - _Requirements: 3.5, 5.1, 6.7, 6.16_
 - [ ] 19. Estresse e zero falhas
   - [ ] 19.1 Escrever `tests/stress/orchestrator-stress.test.js` e corrigir na origem toda falha encontrada: 100 mensagens em rajada (0–20 ms) contra upstream falso lento (até 25 s, relógio falso) e falho (500, timeout, JSON inválido), só o último turno renderiza, nada tardio aparece, chamadas dentro de dedupe e breaker, buscas paralelas e zero `unhandledRejection` ou `uncaughtException`

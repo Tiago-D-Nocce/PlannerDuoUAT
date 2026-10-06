@@ -13,7 +13,7 @@
   }
   function nextTarget() {
     const requested = new URLSearchParams(location.search).get('next') || '';
-    const match = requested.match(/^app\.html(?:#(dashboard|finances|trips|goals|checklist|decisions|reports|settings))?$/);
+    const match = requested.match(/^app\.html(?:#(central|dashboard|finances|trips|goals|checklist|decisions|reports|settings))?$/);
     return match ? requested : 'app.html';
   }
   function showView(view) {

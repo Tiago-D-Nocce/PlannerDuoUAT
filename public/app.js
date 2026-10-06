@@ -18,6 +18,9 @@
     lastActivityAt: Date.now(),
     autoLockTimer: null,
     runtime: null,
+    orchestrator: null,
+    central: null,
+    aiConsent: null,
   };
   const AUTO_LOCK_MS = 30 * 60 * 1000;
 
@@ -285,7 +288,7 @@
   }
 
   function loginTarget() {
-    const allowedViews = new Set(['dashboard', 'finances', 'trips', 'goals', 'checklist', 'decisions', 'reports', 'settings']);
+    const allowedViews = new Set(['central', 'dashboard', 'finances', 'trips', 'goals', 'checklist', 'decisions', 'reports', 'settings']);
     const view = location.hash.slice(1);
     const next = allowedViews.has(view) ? `app.html#${view}` : 'app.html';
     return `auth.html?next=${encodeURIComponent(next)}`;
@@ -301,6 +304,7 @@
     state.locking = true;
     const allTabs = !options || options.allTabs !== false;
     const runtime = state.runtime;
+    const orchestrator = state.orchestrator;
     try { state.unsubscribe?.(); } catch (_) {}
     state.unsubscribe = null;
     if (state.autoLockTimer) window.clearInterval(state.autoLockTimer);
@@ -308,6 +312,13 @@
     state.workspace = null;
     state.account = null;
     state.runtime = null;
+    state.orchestrator = null;
+    state.central = null;
+    state.aiConsent = null;
+    const lockAiToggle = document.getElementById('ai-consent-toggle');
+    if (lockAiToggle) lockAiToggle.checked = false;
+    const lockAiStatus = document.getElementById('ai-status-text');
+    if (lockAiStatus) lockAiStatus.textContent = 'desligado';
     try {
       // O bloqueio em si é a chamada de repositório da skill planner.account.lock;
       // reset do runtime acontece em seguida (fila/cache/breakers).
@@ -319,6 +330,7 @@
     } catch (_) {
       try { sessionStorage.setItem('plannerduo:auth-warning', 'Não foi possível confirmar o bloqueio das outras abas. Feche-as manualmente.'); } catch (_) {}
     } finally {
+      try { orchestrator?.clear?.(); } catch (_) {}
       try { runtime?.reset(); } catch (_) {}
       redirectToLogin();
     }
@@ -922,13 +934,130 @@
     renderSettings();
   }
 
+
+  // ------------------------------------------------------------------
+  // Composição do assistente Central (Stage 4 — task 18).
+  // ------------------------------------------------------------------
+  function composeAssistant() {
+    try {
+      const Orchestrator = window.PlannerOrchestrator;
+      const CentralView = window.PlannerCentralView;
+      if (Orchestrator && typeof Orchestrator.create === 'function' && state.runtime) {
+        state.orchestrator = Orchestrator.create({
+          runtime: state.runtime,
+          nlu: window.PlannerNLU || null,
+          places: window.PlannerPlaces || null,
+          clock: null,
+          aiEnabled: () => Boolean(state.aiConsent && state.aiConsent.enabled),
+          getWorkspace: () => state.workspace,
+        });
+      }
+      if (CentralView && typeof CentralView.create === 'function' && state.orchestrator) {
+        const mountEl = document.getElementById('central-root');
+        if (mountEl) {
+          state.central = CentralView.create({
+            mount: mountEl,
+            orchestrator: state.orchestrator,
+            onAction: (blockId, action, gesture) => {
+              if (state.orchestrator && typeof state.orchestrator.act === 'function') {
+                state.orchestrator.act(blockId, action, gesture);
+              }
+            },
+          });
+        }
+      }
+    } catch (_) {
+      // Falha ao compor o assistente não impede o uso do restante do app.
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Paleta de comandos Ctrl+K (Stage 4 — task 18).
+  // ------------------------------------------------------------------
+  const CommandPalette = window.PlannerCommandPalette;
+  let paletteCommands = null;
+  let palettePreviousFocus = null;
+  let paletteSelectedIndex = -1;
+
+  function openCommandPalette() {
+    const dialog = document.getElementById('command-palette');
+    if (!dialog) return;
+    palettePreviousFocus = document.activeElement;
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');
+    const input = document.getElementById('command-palette-input');
+    if (input) { input.value = ''; input.focus(); }
+    paletteSelectedIndex = -1;
+    renderPaletteResults('');
+  }
+
+  function closeCommandPalette() {
+    const dialog = document.getElementById('command-palette');
+    if (!dialog) return;
+    if (typeof dialog.close === 'function') dialog.close();
+    else dialog.removeAttribute('open');
+    if (palettePreviousFocus && typeof palettePreviousFocus.focus === 'function') {
+      try { palettePreviousFocus.focus(); } catch (_) {}
+    }
+    palettePreviousFocus = null;
+    paletteSelectedIndex = -1;
+  }
+
+  function getPaletteCommands() {
+    if (!paletteCommands && CommandPalette && typeof CommandPalette.buildCommands === 'function') {
+      paletteCommands = CommandPalette.buildCommands();
+    }
+    return paletteCommands || [];
+  }
+
+  function renderPaletteResults(query) {
+    const list = document.getElementById('command-palette-results');
+    if (!list) return;
+    const commands = CommandPalette && typeof CommandPalette.filterCommands === 'function'
+      ? CommandPalette.filterCommands(getPaletteCommands(), query)
+      : getPaletteCommands();
+    list.innerHTML = commands.map((cmd, i) =>
+      '<li role="option" id="cp-opt-' + escapeHtml(cmd.id) + '" class="command-palette-option' + (i === paletteSelectedIndex ? ' selected' : '') + '" data-command-id="' + escapeHtml(cmd.id) + '" aria-selected="' + (i === paletteSelectedIndex ? 'true' : 'false') + '">' + escapeHtml(cmd.label) + '</li>'
+    ).join('');
+    const input = document.getElementById('command-palette-input');
+    if (input) {
+      const selId = paletteSelectedIndex >= 0 && paletteSelectedIndex < commands.length
+        ? 'cp-opt-' + commands[paletteSelectedIndex].id
+        : '';
+      if (selId) input.setAttribute('aria-activedescendant', selId);
+      else input.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  function runPaletteCommand(commandId) {
+    const commands = getPaletteCommands();
+    const cmd = commands.find((c) => c.id === commandId);
+    if (!cmd) return;
+    closeCommandPalette();
+    if (cmd.kind === 'navigate') {
+      navigate(cmd.run);
+    } else if (cmd.kind === 'dialog') {
+      prepareNewDialog(cmd.run);
+      showDialog(document.getElementById(cmd.run));
+    } else if (cmd.kind === 'action') {
+      handleAction(cmd.run, document.createElement('button'));
+    }
+  }
+
   function navigate(view, updateHash) {
     const target = $$('[data-view-panel]').find((panel) => panel.dataset.viewPanel === view);
     if (!target) return;
     state.currentView = view;
     $$('[data-view-panel]').forEach((panel) => panel.classList.toggle('active', panel === target));
     $$('.nav-item[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
-    if (updateHash !== false) history.replaceState(null, '', view === 'dashboard' ? location.pathname : `#${view}`);
+    if (updateHash !== false) history.replaceState(null, '', view === 'central' ? location.pathname : `#${view}`);
+    if (view === 'central') {
+      window.setTimeout(() => {
+        if (state.central && typeof state.central.focus === 'function') { try { state.central.focus(); return; } catch (_) {} }
+        const composer = document.querySelector('#central-root textarea');
+        if (composer && typeof composer.focus === 'function') { try { composer.focus(); } catch (_) {} }
+      }, 80);
+    }
     closeSidebar();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -1173,6 +1302,15 @@
     if (action === 'close-sidebar') return closeSidebar();
     if (action === 'toggle-theme') return toggleTheme();
     if (action === 'lock-vault') return lockVault({ allTabs: true });
+    if (action === 'open-command-palette') return openCommandPalette();
+    if (action === 'add-participant') {
+      navigate('settings');
+      window.setTimeout(() => {
+        const input = document.getElementById('participant-name-input');
+        if (input && typeof input.focus === 'function') { try { input.focus(); } catch (_) {} }
+      }, 120);
+      return;
+    }
     if (action === 'open-security') {
       $('#security-form')?.reset();
       return showDialog($('#security-dialog'));
@@ -1645,8 +1783,70 @@
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') closeSidebar();
+      if ((event.ctrlKey || event.metaKey) && event.key === 'k') {
+        event.preventDefault();
+        openCommandPalette();
+      }
     });
 
+    // Command palette internal events
+    const cpInput = document.getElementById('command-palette-input');
+    if (cpInput) {
+      cpInput.addEventListener('input', () => renderPaletteResults(cpInput.value));
+      cpInput.addEventListener('keydown', (event) => {
+        const allCommands = CommandPalette && typeof CommandPalette.filterCommands === 'function'
+          ? CommandPalette.filterCommands(getPaletteCommands(), cpInput.value)
+          : getPaletteCommands();
+        const count = allCommands.length;
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          paletteSelectedIndex = count > 0 ? (paletteSelectedIndex + 1) % count : -1;
+          renderPaletteResults(cpInput.value);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          paletteSelectedIndex = count > 0 ? (paletteSelectedIndex - 1 + count) % count : -1;
+          renderPaletteResults(cpInput.value);
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          if (paletteSelectedIndex >= 0 && paletteSelectedIndex < count) {
+            runPaletteCommand(allCommands[paletteSelectedIndex].id);
+          }
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          closeCommandPalette();
+        }
+      });
+    }
+    const cpResults = document.getElementById('command-palette-results');
+    if (cpResults) {
+      cpResults.addEventListener('click', (event) => {
+        const option = event.target.closest('[data-command-id]');
+        if (option) runPaletteCommand(option.dataset.commandId);
+      });
+    }
+    const cpDialog = document.getElementById('command-palette');
+    if (cpDialog) {
+      cpDialog.addEventListener('click', (event) => {
+        if (event.target === cpDialog) closeCommandPalette();
+      });
+      cpDialog.addEventListener('cancel', (event) => {
+        event.preventDefault();
+        closeCommandPalette();
+      });
+    }
+    // AI consent toggle
+    const aiToggle = document.getElementById('ai-consent-toggle');
+    if (aiToggle) {
+      aiToggle.addEventListener('change', () => {
+        if (aiToggle.checked) {
+          state.aiConsent = { enabled: true, at: new Date().toISOString() };
+        } else {
+          state.aiConsent = null;
+        }
+        const statusText = document.getElementById('ai-status-text');
+        if (statusText) statusText.textContent = aiToggle.checked ? 'ligado (sessão)' : 'desligado';
+      });
+    }
     window.addEventListener('hashchange', () => {
       const view = location.hash.slice(1);
       if (view) navigate(view, false);
@@ -1697,6 +1897,7 @@
       state.workspace = await Repository.initialize();
       state.workspace = await materializeRecurring(state.workspace);
       state.runtime = createSkillRuntime();
+      composeAssistant();
       bindEvents();
       renderAll();
       state.unsubscribe = Repository.subscribe((workspace) => {
@@ -1720,7 +1921,7 @@
       }
       const requestedView = location.hash.slice(1);
       const validRequestedView = $$('[data-view-panel]').some((panel) => panel.dataset.viewPanel === requestedView);
-      navigate(validRequestedView ? requestedView : 'dashboard', false);
+      navigate(validRequestedView ? requestedView : 'central', false);
       const warning = Repository.getLastWarning();
       if (warning) toast('Banco local recuperado', warning.message, 'error');
       if (!state.workspace.settings.onboardingCompleted

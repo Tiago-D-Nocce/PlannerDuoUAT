@@ -963,3 +963,33 @@ fieldset > p { margin: 2px 0 10px; color: var(--muted); font-size: .8125rem; }
 @media (prefers-reduced-motion: reduce) {
   .cv-skeleton-line { animation: none; }
 }
+
+/* ===================================================================
+   Paleta de comandos (Ctrl+K)
+   =================================================================== */
+.command-palette-dialog { max-width: 540px; width: 92vw; padding: 0; border: 1px solid var(--border); border-radius: var(--r-lg, 16px); background: var(--surface-solid); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.command-palette-dialog::backdrop { background: rgba(0,0,0,.55); }
+.command-palette { display: flex; flex-direction: column; max-height: 60vh; }
+.command-palette-search { display: flex; align-items: center; padding: .75rem 1rem; border-bottom: 1px solid var(--border); }
+.command-palette-search input { flex: 1; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1rem; font-family: inherit; }
+.command-palette-search input::placeholder { color: var(--muted); }
+.command-palette-results { list-style: none; margin: 0; padding: .5rem 0; overflow-y: auto; max-height: 50vh; }
+.command-palette-option { padding: .625rem 1rem; cursor: pointer; color: var(--fg); font-size: .9375rem; transition: background var(--t-base, .15s); border-radius: 0; }
+.command-palette-option:hover, .command-palette-option.selected { background: var(--surface-raised, rgba(255,255,255,.08)); }
+.command-palette-option[aria-selected="true"] { background: var(--surface-raised, rgba(255,255,255,.08)); }
+@media (prefers-reduced-motion: reduce) {
+  .command-palette-option { transition: none; }
+}
+
+/* ===================================================================
+   Integrations panel (Settings)
+   =================================================================== */
+.integration-status { display: flex; align-items: center; gap: .5rem; padding: .5rem 0; font-size: .875rem; color: var(--muted); }
+.integration-status strong { color: var(--fg); }
+.panel-note { font-size: .8125rem; color: var(--muted); margin-top: .5rem; font-style: italic; }
+
+/* ===================================================================
+   Central view section
+   =================================================================== */
+#view-central { padding: 0; }
+#central-root { min-height: 60vh; }
