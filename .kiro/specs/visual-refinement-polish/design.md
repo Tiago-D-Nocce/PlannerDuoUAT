@@ -311,11 +311,15 @@ For every color token in `:root` (`--ac-dark-blue`, `--ac-medium-blue`, `--ac-or
 
 - *Testable (property):* parse `:root`, extract `name → value` for every declaration whose value matches a color pattern (`#hex`, `rgb(a)`, named color, `linear-gradient`, or `var()` pointing at a color token); assert the map is unchanged against a baseline snapshot.
 
+**Validates: Requirements 1.1, 1.2, 1.3**
+
 ### Property 2: No new colors introduced
 
 The set of distinct hex/`rgba` literals in the file after refinement is a subset of the set before refinement.
 
 - *Testable (property):* collect all color literals before/after; assert `after ⊆ before`.
+
+**Validates: Requirements 2.1, 2.2**
 
 ### Property 3: Layout geometry invariance
 
@@ -323,11 +327,15 @@ The set of distinct hex/`rgba` literals in the file after refinement is a subset
 
 - *Testable (example + property):* regex/parse these specific declarations and assert equality to baseline; assert breakpoint presence (already covered by `layout-audit.test.js`).
 
+**Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6**
+
 ### Property 4: No fixed wide width regression
 
 No non-decorative rule outside `@media` gains a `width: >= 360px`.
 
 - *Testable (property):* reuse the existing `offendingWidths` check from `layout-audit.test.js`; assert empty.
+
+**Validates: Requirement 4.1**
 
 ### Property 5: Typographic floor preserved
 
@@ -335,11 +343,15 @@ Every resolvable fixed `font-size` is `>= 13px`.
 
 - *Testable (property):* reuse `collectFontSizes` from `tokens.test.js`; assert min `>= 12.9px`.
 
+**Validates: Requirements 5.1, 5.2**
+
 ### Property 6: Resources stay local
 
 No `@import`, no remote `url(http...)`, no CDN/font host references, no remote `@font-face`.
 
 - *Testable (property):* reuse the "recursos 100% locais" checks from `tokens.test.js`; assert all pass.
+
+**Validates: Requirements 6.1, 6.2, 6.3**
 
 ### Property 7: Scale tokens present and referenced
 
@@ -347,11 +359,15 @@ The new `--space-*` and `--fs-*` tokens are defined in `:root`, and at least a t
 
 - *Testable (example):* assert `:root` defines `--space-1..8` and `--fs-xs..3xl`; assert count of `var(--space-` and `var(--fs-` references exceeds a baseline threshold.
 
+**Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8**
+
 ### Property 8: Accessibility affordances retained
 
 `:focus-visible` focus ring and the `--focus-ring` token remain; any `prefers-reduced-motion` / `@supports` fallbacks that exist are not removed.
 
 - *Testable (example):* assert `--focus-ring` and `:focus-visible` present; assert no net removal of motion/backdrop fallback blocks.
+
+**Validates: Requirements 8.1, 8.2, 8.3**
 
 > Verification note: when writing the automated check for properties 1–3, capture a **baseline snapshot** of the current `style.css` color/geometry maps *before* editing. Because the current `style.css` palette (`#1e3a8a`, `#f28a1e`, etc.) differs from some literals asserted in the older `tokens.test.js` (which references `#27c0d4`/`#070a12`/backdrop fallbacks from a prior design state), the authoritative baseline for *this* feature is the present on-disk `style.css`, and the invariance tests must compare against that captured baseline rather than hard-coded legacy values.
 
