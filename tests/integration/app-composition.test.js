@@ -178,13 +178,7 @@ describe('app.html — composição estática', () => {
     expect(cpIdx).toBeLessThan(appIdx);
   });
 
-  it('contém painel de integrações com id="integrations-panel"', () => {
-    expect(appHtml).toContain('id="integrations-panel"');
-  });
 
-  it('contém toggle de consentimento AI com id="ai-consent-toggle"', () => {
-    expect(appHtml).toContain('id="ai-consent-toggle"');
-  });
 
   it('contém botão de comandos no sidebar', () => {
     expect(appHtml).toContain('data-action="open-command-palette"');

@@ -234,7 +234,7 @@ label { display: grid; gap: 6px; font-weight: bold; color: var(--text); margin-b
 .entity-hero h2 { margin: 0; color: var(--ac-orange); font-size: 1.3rem; }
 .entity-hero > span { font-size: 2.5rem; }
 .entity-hero .status-pill { display: none; }
-.status-pill { padding: 6px 12px; border-radius: var(--radius-pill); background-color: var(--ac-dark-blue); color: var(--ac-white); font-size: .8rem; font-weight: bold; }
+.status-pill { padding: 6px 12px; border-radius: var(--radius-pill); background-color: var(--ac-dark-blue); color: var(--ac-white); font-size: .8125rem; font-weight: bold; }
 .travel-search-panel { padding: 30px; border-radius: var(--radius-lg); background-color: var(--ac-card-orange); margin-bottom: 30px; }
 .travel-search-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; align-items: end; background-color: var(--ac-white); padding: 20px; border-radius: var(--radius); border: 1px solid var(--line); }
 
@@ -289,4 +289,26 @@ label { display: grid; gap: 6px; font-weight: bold; color: var(--text); margin-b
   .app-topbar { display: none; }
   .dashboard-grid { grid-template-columns: 1fr; }
   .view { margin: 10px; padding: 20px; }
+}
+
+/* ===== Acessibilidade e responsividade (sync) ===== */
+@media (max-width: 600px) {
+  main { padding: 0 12px; }
+  .page-heading { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .dashboard-grid, .metric-grid { grid-template-columns: 1fr; }
+  .landing-content h1 { font-size: 2.2rem; }
+  .vault-auth-card { padding: 28px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .card, .panel { background-color: var(--ac-white); }
 }

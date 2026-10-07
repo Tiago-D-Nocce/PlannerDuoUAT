@@ -85,37 +85,33 @@ describe('tokens.css — piso tipográfico (nada abaixo de 13px)', () => {
   });
 });
 
-describe('tokens.css — paleta de design (§7.14.1)', () => {
-  // os tokens escuros vivem em :root (padrão) ou em [data-theme="dark"].
-  function darkScope() {
-    const rootMatch = css.match(/:root\s*\{[\s\S]*?\}/i);
-    const darkMatch = css.match(/\[data-theme=["']dark["']\]\s*\{[\s\S]*?\}/i);
-    return (rootMatch ? rootMatch[0] : '') + '\n' + (darkMatch ? darkMatch[0] : '');
+describe('tokens.css — paleta de design (AgendaCar)', () => {
+  // A identidade visual atual é a paleta clara AgendaCar (laranja + azul).
+  // Os tokens vivem em :root. Usamos o CSS inteiro como escopo de busca.
+  function rootScope() {
+    const m = css.match(/:root\s*\{[\s\S]*?\}/i);
+    return m ? m[0] : '';
   }
 
-  it('define o gradiente de destaque índigo #3a5bd0 -> ciano #27c0d4', () => {
-    const scope = darkScope();
-    expect(/#3a5bd0/i.test(scope)).toBe(true);
-    expect(/#27c0d4/i.test(scope)).toBe(true);
-    // o gradiente aparece como linear-gradient com as duas pontas.
-    expect(/linear-gradient\([^)]*#3a5bd0[^)]*#27c0d4/i.test(css)).toBe(true);
+  it('define o laranja de destaque #f28a1e', () => {
+    const root = rootScope();
+    expect(/#f28a1e/i.test(root)).toBe(true);
   });
 
-  it('define o fundo profundo #070a12', () => {
-    expect(/#070a12/i.test(darkScope())).toBe(true);
+  it('define o azul institucional #1e3a8a', () => {
+    expect(/#1e3a8a/i.test(rootScope())).toBe(true);
   });
 
-  it('define a cor de foco ciano #27c0d4', () => {
-    // #27c0d4 é o ciano usado tanto no destaque quanto no anel de foco.
-    expect(/#27c0d4/i.test(darkScope())).toBe(true);
-    // existe um token/anel de foco no CSS.
+  it('define a cor de foco (anel de foco laranja)', () => {
+    // O anel de foco usa a cor de destaque laranja.
     expect(/focus-ring|:focus-visible/i.test(css)).toBe(true);
+    expect(/--focus-ring[^<]*ac-orange/i.test(css)).toBe(true);
   });
 
-  it('define a paleta de referência do design (índigo, ciano, laranja, vermelho)', () => {
-    const root = css.match(/:root\s*\{[\s\S]*?\}/i)?.[0] || '';
-    expect(/#1e3a8a/i.test(root)).toBe(true); // índigo
-    expect(/#27c0d4/i.test(root)).toBe(true); // ciano
+  it('define a paleta de referência do design (azul, ciano, laranja, vermelho)', () => {
+    const root = rootScope();
+    expect(/#1e3a8a/i.test(root)).toBe(true); // azul institucional
+    expect(/#74d2e7/i.test(root)).toBe(true); // ciano claro
     expect(/#f28a1e/i.test(root)).toBe(true); // laranja
     expect(/#f23c13/i.test(root)).toBe(true); // vermelho
   });
