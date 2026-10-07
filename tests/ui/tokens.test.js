@@ -93,23 +93,31 @@ describe('tokens.css — paleta de design (§7.14.1)', () => {
     return (rootMatch ? rootMatch[0] : '') + '\n' + (darkMatch ? darkMatch[0] : '');
   }
 
-  it('define o gradiente de destaque #7c8cff -> #3ee0ff', () => {
+  it('define o gradiente de destaque índigo #3a5bd0 -> ciano #27c0d4', () => {
     const scope = darkScope();
-    expect(/#7c8cff/i.test(scope)).toBe(true);
-    expect(/#3ee0ff/i.test(scope)).toBe(true);
+    expect(/#3a5bd0/i.test(scope)).toBe(true);
+    expect(/#27c0d4/i.test(scope)).toBe(true);
     // o gradiente aparece como linear-gradient com as duas pontas.
-    expect(/linear-gradient\([^)]*#7c8cff[^)]*#3ee0ff/i.test(css)).toBe(true);
+    expect(/linear-gradient\([^)]*#3a5bd0[^)]*#27c0d4/i.test(css)).toBe(true);
   });
 
-  it('define o fundo profundo #05060a', () => {
-    expect(/#05060a/i.test(darkScope())).toBe(true);
+  it('define o fundo profundo #070a12', () => {
+    expect(/#070a12/i.test(darkScope())).toBe(true);
   });
 
-  it('define a cor de foco #3ee0ff', () => {
-    // #3ee0ff é o ciano usado tanto no destaque quanto no anel de foco.
-    expect(/#3ee0ff/i.test(darkScope())).toBe(true);
+  it('define a cor de foco ciano #27c0d4', () => {
+    // #27c0d4 é o ciano usado tanto no destaque quanto no anel de foco.
+    expect(/#27c0d4/i.test(darkScope())).toBe(true);
     // existe um token/anel de foco no CSS.
     expect(/focus-ring|:focus-visible/i.test(css)).toBe(true);
+  });
+
+  it('define a paleta de referência do design (índigo, ciano, laranja, vermelho)', () => {
+    const root = css.match(/:root\s*\{[\s\S]*?\}/i)?.[0] || '';
+    expect(/#1e3a8a/i.test(root)).toBe(true); // índigo
+    expect(/#27c0d4/i.test(root)).toBe(true); // ciano
+    expect(/#f28a1e/i.test(root)).toBe(true); // laranja
+    expect(/#f23c13/i.test(root)).toBe(true); // vermelho
   });
 });
 

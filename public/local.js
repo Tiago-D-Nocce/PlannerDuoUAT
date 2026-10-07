@@ -13,7 +13,7 @@
   const AUTH_EVENT_KEY = 'plannerduo:vault-event:v1';
   const AUTH_EPOCH_KEY = 'plannerduo:vault-auth-epoch:v1';
   const CLEAN_START_KEY = 'plannerduo:clean-start:v1';
-  const THEME_KEY = 'plannerduo:theme';
+  const THEME_KEY = 'plannerduo:theme:v2';
   const VAULT_FORMAT = 'plannerduo-vault';
   const VAULT_VERSION = 1;
   const KDF_ITERATIONS = 600000;

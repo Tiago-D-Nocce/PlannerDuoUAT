@@ -533,6 +533,7 @@
     setText('#security-account-name', accountName);
     setText('#security-account-email', state.account?.email || '');
     setText('#sidebar-workspace-name', workspaceName);
+    setText('#topbar-workspace-name', workspaceName);
     setText('#dashboard-greeting', state.workspace.name ? `${state.workspace.name}, em um só lugar.` : 'Planeje do seu jeito.');
     setText('#dashboard-subtitle', activeParticipants().length
       ? 'Finanças, viagens, metas e escolhas organizadas por quem realmente participa.'
@@ -1050,6 +1051,12 @@
     state.currentView = view;
     $$('[data-view-panel]').forEach((panel) => panel.classList.toggle('active', panel === target));
     $$('.nav-item[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+    const viewTitles = {
+      central: 'Assistente', dashboard: 'Visão geral', finances: 'Finanças', trips: 'Viagens',
+      goals: 'Metas', checklist: 'Checklist', decisions: 'Decisões', reports: 'Relatórios', settings: 'Configurações'
+    };
+    setText('#topbar-view-title', viewTitles[view] || 'PlannerDuo');
+    setText('#topbar-workspace-name', state.workspace?.name || 'Meu workspace');
     if (updateHash !== false) history.replaceState(null, '', view === 'central' ? location.pathname : `#${view}`);
     if (view === 'central') {
       window.setTimeout(() => {
@@ -1116,7 +1123,8 @@
   function applyTheme(theme) {
     const selected = theme === 'dark' ? 'dark' : 'light';
     document.documentElement.dataset.theme = selected;
-    setText('#theme-icon', selected === 'dark' ? '☀' : '◐');
+    const themeGlyph = selected === 'dark' ? '☀' : '◐';
+    document.querySelectorAll('.theme-icon, #theme-icon').forEach((el) => { el.textContent = themeGlyph; });
     try { localStorage.setItem(Repository.THEME_KEY, selected); } catch (_) {}
   }
 
@@ -1888,10 +1896,13 @@
       }
       state.account = restoredSession.account;
       state.sessionExpiresAt = restoredSession.expiresAt || 0;
-      let theme = 'dark';
+      // Tema claro é o padrão (conforme o design de referência). Só respeitamos
+      // uma escolha explícita salva pelo usuário; não seguimos o tema do SO para
+      // garantir que a identidade visual clara apareça por padrão.
+      let theme = 'light';
       try {
-        theme = localStorage.getItem(Repository.THEME_KEY)
-          || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        const stored = localStorage.getItem(Repository.THEME_KEY);
+        if (stored === 'dark' || stored === 'light') theme = stored;
       } catch (_) {}
       applyTheme(theme);
       state.workspace = await Repository.initialize();

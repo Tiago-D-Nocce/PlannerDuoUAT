@@ -11,8 +11,8 @@
   const FORMAT = 'plannerduo-workspace';
   const MAX_AMOUNT = 1_000_000_000;
   const PALETTE = Object.freeze([
-    '#6366f1', '#f97316', '#14b8a6', '#ec4899', '#8b5cf6',
-    '#0ea5e9', '#22c55e', '#eab308', '#ef4444', '#64748b',
+    '#1e3a8a', '#27c0d4', '#f28a1e', '#f23c13', '#8b5cf6',
+    '#0ea5e9', '#22c55e', '#eab308', '#ec4899', '#64748b',
   ]);
   const CATEGORIES = Object.freeze([
     'alimentacao', 'transporte', 'moradia', 'lazer', 'saude',
