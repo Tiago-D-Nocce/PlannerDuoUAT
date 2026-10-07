@@ -2,7 +2,7 @@
 :root {
   color-scheme: dark;
   /* Paleta escura (padrão) */
-  --bg: #0B0F19;
+  --bg: #05060a;
   --surface: rgba(255, 255, 255, .035);
   --surface-raised: rgba(255, 255, 255, .06);
   --surface-solid: #0c0e14;
