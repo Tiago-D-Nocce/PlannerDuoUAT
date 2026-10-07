@@ -1,0 +1,120 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "2.1 Define spacing and type scale tokens inside the existing `:root`": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367276746
+      }
+    ],
+    "3. Checkpoint - tokens defined, palette/geometry still intact": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367276785
+      }
+    ],
+    "4.1 Snap spacing in structural containers (views, panels, sidebar nav)": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367276836
+      }
+    ],
+    "4.2 Snap spacing in headers, dashboard, tables, forms": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367276875
+      }
+    ],
+    "4.3 Snap spacing in buttons, cards, dialogs/toast, landing/auth": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367276922
+      }
+    ],
+    "5.1 Replace `font-size` literals with Type_Scale tokens + line-height/letter-spacing": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367276966
+      }
+    ],
+    "6.1 Apply consistent radius and elevation steps": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367277004
+      }
+    ],
+    "7.1 Normalize hover/active/focus transitions": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367277044
+      }
+    ],
+    "8. Checkpoint - all scales applied, palette/geometry unchanged": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367277084
+      }
+    ],
+    "10. Final checkpoint - run the full suite": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367277126
+      }
+    ],
+    "1.1 Add `tests/ui/_baseline-style.js` helper that captures the on-disk baseline": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367295599
+      },
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367342791
+      },
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791368239309
+      }
+    ],
+    "9.1 Add `tests/ui/visual-refinement.test.js` for snapshot invariance + scale usage": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367304486
+      }
+    ],
+    "9.2 Extend `tests/ui/tokens.test.js` for floor, local resources, and token/a11y presence": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367305878
+      }
+    ],
+    "9.3 Extend `tests/ui/layout-audit.test.js` for wide-width and breakpoint guards": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791367306275
+      }
+    ],
+    "1. Capture baseline snapshot of current `public/style.css`": [
+      {
+        "executionId": "bb26d8d7-a88d-42a1-a6ff-cb6ccb1cb60c",
+        "chatSessionId": "sess_21fe979d-abf3-451b-b5f7-d1dce4193a0e",
+        "timestamp": 1791368239393
+      }
+    ]
+  }
+}

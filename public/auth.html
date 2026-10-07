@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR" data-theme="dark">
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -48,7 +48,7 @@
           <label><span>Senha</span><div class="password-field"><input id="unlock-password" type="password" autocomplete="current-password" maxlength="128" required autofocus><button type="button" data-toggle-password="unlock-password" aria-label="Mostrar senha">◉</button></div></label>
           <button class="button primary vault-submit" type="submit"><span aria-hidden="true">↗</span> Entrar</button>
         </form>
-        <button class="auth-text-action" type="button" data-auth-view="recovery">Esqueci a senha</button>
+        <button class="auth-text-action" type="button" data-auth-view="recovery">Primeiro acesso? Crie sua conta</button>
         <p class="auth-security-hint">Não há recuperação por e-mail. Sem a senha, seus dados não podem ser abertos.</p>
       </div>
 
@@ -66,6 +66,7 @@
           <label class="auth-agreement"><input id="setup-no-recovery" type="checkbox" required><span>Entendo que não há recuperação de senha e vou guardar um backup.</span></label>
           <button class="button primary vault-submit" type="submit"><span aria-hidden="true">⌗</span> Criar e entrar</button>
         </form>
+        <button class="auth-text-action" type="button" data-auth-view="unlock">Já tem conta? Entrar</button>
       </div>
 
       <div id="auth-recovery" class="auth-state">
