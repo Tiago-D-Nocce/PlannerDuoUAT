@@ -278,6 +278,53 @@ label { display: grid; gap: 6px; font-weight: bold; color: var(--text); margin-b
 .auth-state-heading p { color: var(--muted); margin: 0; }
 .auth-state-icon, .eyebrow { display: none; }
 
+/* ===== Auth components (standardization) ===== */
+/* Exactly one auth screen is visible, matching auth.js showView(). */
+.auth-state { display: none; }
+.auth-state.active { display: block; }
+
+/* Standardized internal vertical spacing for auth forms. */
+.vault-form { display: grid; gap: 18px; }
+
+/* Profile block: avatar-left chip with name + email stacked (Req 2.2). */
+.local-account-chip { display: flex; align-items: center; gap: 12px; margin: 16px 0 24px; }
+.local-account-chip > span { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--radius-pill); background-color: var(--surface-3); color: var(--text); font-weight: bold; }
+.local-account-chip strong { font-weight: bold; color: var(--text); }
+.local-account-chip small { display: block; font-weight: normal; font-size: 0.8125rem; color: var(--muted); }
+
+/* Password field: embedded right-aligned toggle, never below the input (Req 2.3). */
+.password-field { position: relative; display: flex; align-items: center; }
+.password-field input { padding-right: 44px; }
+.password-field [data-toggle-password] { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; min-height: auto; padding: 4px; background: transparent; border: none; color: var(--muted); cursor: pointer; }
+.password-field [data-toggle-password]:hover { color: var(--ac-dark-blue); }
+
+/* Secondary text link: borderless dark-blue action (Req 2.7). */
+.auth-text-action { display: block; margin: 16px auto 0; padding: 0; background: transparent; border: none; color: var(--ac-dark-blue); font-size: 0.875rem; font-weight: bold; text-align: center; cursor: pointer; }
+.auth-text-action:hover, .auth-text-action:focus-visible { text-decoration: underline; }
+
+/* Consent checkbox inline with its text (Req 2.8). */
+.auth-agreement { display: flex; align-items: flex-start; gap: 10px; font-weight: normal; }
+.auth-agreement input[type="checkbox"] { flex: 0 0 auto; width: auto; margin-right: 2px; }
+.auth-agreement span { font-weight: normal; color: var(--text); text-align: left; }
+
+/* Recovery notice block (Req 2.9). */
+.recovery-warning { padding: 16px; border-radius: var(--radius); background-color: var(--surface-2); margin-bottom: 20px; }
+.recovery-warning strong { display: block; font-weight: bold; color: var(--text); margin-bottom: 6px; }
+.recovery-warning p { margin: 0; font-weight: normal; color: var(--text-2); }
+
+/* Recovery actions alignment (Req 2.10). */
+.auth-recovery-actions { display: flex; gap: 12px; justify-content: space-between; margin-top: 20px; }
+.vault-raw-download { display: block; margin-bottom: 16px; }
+
+/* Full-width primary auth buttons (Req 2.4/2.6). */
+.vault-submit { width: 100%; }
+
+/* Supporting text: muted, centered, legible (Req 2.6). */
+.auth-security-hint, .auth-inline-status { font-size: 0.8125rem; color: var(--muted); text-align: center; }
+.auth-security-hint { margin-top: 16px; }
+.auth-inline-status { margin-top: 12px; }
+.auth-back-link { font-size: 0.875rem; color: var(--muted); }
+
 /* ===== Mobile Responsividade ===== */
 @media (max-width: 900px) {
   .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; bottom: auto; height: auto; position: relative; }
@@ -296,6 +343,7 @@ label { display: grid; gap: 6px; font-weight: bold; color: var(--text); margin-b
   main { padding: 0 12px; }
   .page-heading { flex-direction: column; align-items: flex-start; gap: 10px; }
   .dashboard-grid, .metric-grid { grid-template-columns: 1fr; }
+  .form-grid.two { grid-template-columns: 1fr; }
   .landing-content h1 { font-size: 2.2rem; }
   .vault-auth-card { padding: 28px 20px; }
 }

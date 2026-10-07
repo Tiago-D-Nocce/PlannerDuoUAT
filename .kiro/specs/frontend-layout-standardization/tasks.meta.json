@@ -1,0 +1,154 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "Exploration test FAILS on unfixed code as expected (8/9 Bug Condition assertions fail), confirming the bug. Counterexamples (each enumerated selector resolves to zero standardized declarations in public/style.css):\n- Req 2.1: `.auth-state { display: none }` + `.auth-state.active { display: block }` ABSENT — only `.auth-state-heading`/`.auth-state-icon` exist, so no CSS state visibility.\n- Req 2.2: `.local-account-chip` has no flex rule (no display:flex/align-items:center/gap) — profile block collapses to raw inline defaults.\n- Req 2.3: `.password-field` has no position:relative/display:flex AND `[data-toggle-password]` has no rule — toggle floats below the input.\n- Req 2.7: `.auth-text-action` has no rule — inherits default <button> chrome (border/background) instead of a borderless var(--ac-dark-blue) text link.\n- Req 2.8: `.auth-agreement` has no display:flex — checkbox detached from its text.\n- Req 2.9: `.recovery-warning` has no notice-block rule (no padding + border-radius:var(--radius)) — raw unstyled text.\n- Req 2.10: `.auth-recovery-actions` has no display:flex — default misaligned buttons.\n- Req 2.5: `@media (max-width:600px)` block does NOT override `.form-grid.two` to grid-template-columns:1fr — two columns never stack, placeholder truncated.\nThe 9th assertion (Req 2.11/3.1 no new hex) passes trivially (no standardized rules exist yet) and is the token-discipline guard that must stay green after the fix. DO NOT FIX per bugfix exploration protocol.",
+      "lastRunTimestamp": 1791408279463
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064463
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408080129
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408302104
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064550
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408317992
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408456219
+      }
+    ],
+    "3.1 Add auth-state visibility and card/section spacing rules": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064616
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408463948
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408533764
+      }
+    ],
+    "3.2 Add profile block, password field, consent, text-link, and recovery component rules": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064674
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408537138
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408673833
+      }
+    ],
+    "3.3 Add the two-column grid stacking override inside the 600px breakpoint": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064741
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408682096
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408728816
+      }
+    ],
+    "3.4 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064811
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408732055
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408791349
+      }
+    ],
+    "3.5 Verify preservation tests still pass": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064891
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408794950
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408830974
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408064955
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408835601
+      },
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408913855
+      }
+    ],
+    "3. Fix for missing/misaligned auth component styling (additive CSS in `public/style.css` only)": [
+      {
+        "executionId": "dea10291-d65d-4be4-ac9a-5001267f35f8",
+        "chatSessionId": "sess_c2b0eae8-0723-4fe1-8732-23db7e1b382d",
+        "timestamp": 1791408831086
+      }
+    ]
+  }
+}

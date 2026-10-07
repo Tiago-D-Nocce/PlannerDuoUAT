@@ -1,0 +1,103 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Bug Condition** - Missing / Misaligned Auth Component Styling
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists (components fall back to raw browser defaults because their CSS rules are missing)
+  - **Scoped PBT Approach**: The defect is deterministic (static CSS on disk). Scope the property to the concrete enumerated selectors so the counterexamples are reproducible rather than randomly generated.
+  - Create a new test file `tests/ui/auth-standardization.test.js` that reads `public/style.css` from disk (no browser), mirroring the parsing approach in `tests/ui/layout-audit.test.js` and `tests/ui/tokens.test.js`
+  - Assert, for ALL selectors satisfying the Bug Condition (`isBugCondition` in design — Bug Details > Bug Condition), that a standardized rule block exists. On UNFIXED code these assertions encode Expected Behavior and will FAIL:
+    - `.local-account-chip` has a rule establishing `display: flex` with `align-items: center` and a `gap` (profile layout — design change 2, Req 2.2)
+    - `.password-field` has a rule establishing a positioning/flex context (`position: relative` or `display: flex`) AND its `[data-toggle-password]` toggle is right-aligned/embedded (`position: absolute; right:` or flex right alignment), never floating below (design change 3, Req 2.3)
+    - `.auth-text-action` has a rule with `background: transparent`/no `border` and `color: var(--ac-dark-blue)` so it renders as a borderless text link, not a default button (design change 7, Req 2.7)
+    - `.auth-agreement` has a rule with `display: flex` so the checkbox is inline with its text (design change 8, Req 2.8)
+    - `.recovery-warning` has a notice-block rule with padding + `border-radius: var(--radius)` (design change 9, Req 2.9)
+    - `.auth-recovery-actions` has an alignment rule (`display: flex`) (design change 9, Req 2.10)
+    - `.auth-state` has `display: none` and `.auth-state.active` has `display: block` (edge case — auth state visibility, design change 1, Req 2.1)
+    - the `@media (max-width: 600px)` block overrides `.form-grid.two` to a single column (`grid-template-columns: 1fr`) (design change 5, Req 2.5)
+    - the new rules reference only `var(--...)` tokens / existing palette values (no new hex colors) (Req 2.11, 3.1)
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS (this is correct - it proves the enumerated selectors have no standardized rule and fall back to defaults)
+  - Document counterexamples found (e.g. "`.local-account-chip` resolves to zero declarations", "`.auth-text-action` has no rule so it inherits default `<button>` chrome", "`.form-grid.two` is never overridden inside the 600px breakpoint so the placeholder truncates")
+  - Mark task complete when the test is written, run, and the failure is documented
+  - _Bug_Condition: isBugCondition(X) from design (Bug Details > Bug Condition)_
+  - _Requirements: 2.1, 2.2, 2.3, 2.5, 2.7, 2.8, 2.9, 2.10, 2.11_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Non-Buggy Inputs Behave Identically
+  - **IMPORTANT**: Follow observation-first methodology — observe behavior on the UNFIXED stylesheet first, then encode it
+  - Establish the green baseline by running the existing regression gates on UNFIXED code: `tests/ui/tokens.test.js` and `tests/ui/layout-audit.test.js` (both already pass today and encode the strongest preservation invariants)
+  - Observe on UNFIXED code and record the baseline that must be preserved:
+    - Palette tokens `#1e3a8a`, `#f28a1e`, `#74d2e7`, `#f23c13` and all `:root` tokens are present (observed via `tokens.test.js`)
+    - No remote resources (`@import`, `url(http...)`, font CDNs, remote `@font-face`) and every fixed `font-size` resolves to ≥13px (observed via `tokens.test.js`)
+    - No fixed `width ≥ 360px` in a non-decorative rule outside `@media`; both the 900px and 600px breakpoints are present; every `<button>` in `app.html` is named; ≥10 decorative `aria-hidden="true"` icons (observed via `layout-audit.test.js`)
+    - `auth.js` and `local.js` are unchanged, so state transitions, the password toggle, the strength indicator, and the "APAGAR" destroy-vault confirmation stay intact
+  - Add a preservation block to `tests/ui/auth-standardization.test.js` as property-based assertions over the whole stylesheet (reusing the collector approach from the existing suites) that hold on UNFIXED code and must still hold after the fix:
+    - over ALL `font-size` declarations, every fixed value resolves to ≥13px
+    - over ALL top-level (non-`@media`) rules, no non-decorative rule declares a fixed `width ≥ 360px` (the `.form-grid.two` single-column override must live INSIDE the 600px `@media`)
+    - over ALL `url(...)`/`@import` occurrences, none are remote
+    - the four palette hex values remain present in `:root`
+  - Run the tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms the baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Preservation: Preservation Requirements from design (Expected Behavior > Preservation Requirements)_
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+- [x] 3. Fix for missing/misaligned auth component styling (additive CSS in `public/style.css` only)
+
+  - [x] 3.1 Add auth-state visibility and card/section spacing rules
+    - Add `.auth-state { display: none; }` and `.auth-state.active { display: block; }` so exactly one auth screen shows, matching `auth.js` `showView()`
+    - Keep `.vault-auth-card` centered within the 450–500px band (`max-width: 480px`) with standardized `padding: 40px`; standardize internal vertical spacing (e.g. `.vault-form { display: grid; gap }`)
+    - _Bug_Condition: isBugCondition(X) where X.isAuthCardContainer_
+    - _Expected_Behavior: card centered 450–500px, standardized padding/spacing, single `.active` state visible (Property 1)_
+    - _Preservation: reuse existing `--radius`/spacing tokens; no palette change (Property 2)_
+    - _Requirements: 2.1_
+
+  - [x] 3.2 Add profile block, password field, consent, text-link, and recovery component rules
+    - `.local-account-chip`: `display: flex; align-items: center; gap: 12px;` with top/bottom margin; circular avatar `<span>` (fixed size, `border-radius: var(--radius-pill)`, soft gray background, centered bold initials); `strong` name bold `--text`, `small` email regular `--muted` (≥13px) stacked beneath
+    - `.password-field`: `position: relative; display: flex; align-items: center;`; inner `input` reserves right padding (`padding-right: 44px`); `[data-toggle-password]` embedded and right-aligned (`position: absolute; right: 8px;`), transparent background, no border, pointer cursor, `--muted`/`--ac-dark-blue` icon — never below the field
+    - `.auth-text-action`: `background: transparent; border: none; padding: 0;` centered, `color: var(--ac-dark-blue)`, pointer, ≥13px; `:hover`/`:focus-visible` subtle underline, keep global focus token
+    - `.auth-agreement`: override default `label` grid with `display: flex; align-items: flex-start; gap: 10px;`; `input[type="checkbox"]` fixed small size + `width: auto`; `<span>` regular weight, left-aligned
+    - `.recovery-warning`: notice block with padding, `border-radius: var(--radius)`, light gray/blue-gray background (`--surface-2`/`--surface-3`), bold `<strong>` title, regular `<p>`, bottom margin
+    - `.auth-recovery-actions`: `display: flex; gap; justify-content;` to align actions; `.vault-raw-download` reuses `.button.ghost` text-link treatment
+    - `.vault-submit`: `width: 100%;` for full-width primary buttons (reuse global `.button` padding `12px 24px` and inline-icon `gap: 8px`)
+    - Supporting text (`.auth-security-hint`, `.auth-inline-status`, `.auth-back-link`): consistent `--muted` color, centered/legible, ≥13px
+    - Confirm standardized `input, select, textarea` style already applies to the "APAGAR" field (6px radius via `--radius-sm`, ~12px padding, soft gray border, `--ac-orange` focus) — add no per-field override that reintroduces inconsistency
+    - _Bug_Condition: isBugCondition(X) where X is profile block / password field / consent checkbox / secondary text link / recovery notice or action / input_
+    - _Expected_Behavior: expectedBehavior(render) from design (Property 1) — avatar-left profile, embedded right-aligned toggle, inline consent, borderless dark-blue link, full-width centered primary button, standardized input_
+    - _Preservation: every declaration references existing palette/radius tokens only; no new hex color (Property 2)_
+    - _Requirements: 2.2, 2.3, 2.4, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11_
+
+  - [x] 3.3 Add the two-column grid stacking override inside the 600px breakpoint
+    - Inside the existing `@media (max-width: 600px)` block add `.form-grid.two { grid-template-columns: 1fr; }` so the "Seu nome" and "E-mail local" fields stack and the "Como devemos chamar você?" placeholder is fully visible
+    - Keep `grid-template-columns: 1fr 1fr` at desktop; the override MUST live inside `@media` so no fixed non-media width is introduced
+    - _Bug_Condition: isBugCondition(X) where X.isInput within non-stacking `.form-grid.two`_
+    - _Expected_Behavior: placeholder fully visible; columns stack on small screens (Property 1)_
+    - _Preservation: override is inside the 600px `@media`, preserving the layout-audit no-wide-fixed-width invariant (Property 2)_
+    - _Requirements: 2.5_
+
+  - [x] 3.4 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - Standardized, Aligned, Palette-Preserving Rendering
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior; passing it confirms the enumerated components now render with standardized styling
+    - Run the bug condition exploration test from task 1 (`tests/ui/auth-standardization.test.js`)
+    - **EXPECTED OUTCOME**: Test PASSES (confirms the bug is fixed)
+    - _Expected_Behavior: Expected Behavior Properties from design (Property 1)_
+    - _Requirements: 2.1, 2.2, 2.3, 2.5, 2.7, 2.8, 2.9, 2.10, 2.11_
+
+  - [x] 3.5 Verify preservation tests still pass
+    - **Property 2: Preservation** - Non-Buggy Inputs Behave Identically
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run the preservation property tests from task 2 plus the existing gates `tests/ui/tokens.test.js` and `tests/ui/layout-audit.test.js`
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions — palette, local-only resources, ≥13px floor, breakpoints, named buttons, no wide fixed width, untouched behavior all preserved)
+    - Confirm all tests still pass after the fix (no regressions)
+    - _Preservation: Preservation Requirements from design (Property 2)_
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Run the full suite (`npm test`) and confirm the new exploration/preservation tests plus `tests/ui/tokens.test.js` and `tests/ui/layout-audit.test.js` are all green
+  - Confirm the fix touched only `public/style.css` (no markup/JS changes) and introduced no new color hex values
+  - Ensure all tests pass; ask the user if questions arise
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
