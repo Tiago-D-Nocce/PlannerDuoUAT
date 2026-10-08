@@ -1,0 +1,135 @@
+{
+  "colorTokens": {
+    "--ac-dark-blue": "#1e3a8a",
+    "--ac-medium-blue": "#234796",
+    "--ac-orange": "#f28a1e",
+    "--ac-orange-hover": "#e07712",
+    "--ac-orange-border": "#c45500",
+    "--ac-light-cyan": "#74d2e7",
+    "--ac-bg-gray": "#eaeaea",
+    "--ac-text-blue": "#1a2b56",
+    "--ac-card-orange": "#ffe8d6",
+    "--ac-white": "#ffffff",
+    "--bg": "var(--ac-bg-gray)",
+    "--surface": "var(--ac-white)",
+    "--surface-raised": "var(--ac-white)",
+    "--surface-solid": "var(--ac-white)",
+    "--surface-solid-raised": "var(--ac-white)",
+    "--surface-2": "#f8f9fa",
+    "--surface-3": "#e5e8ec",
+    "--sidebar": "var(--ac-dark-blue)",
+    "--sidebar-2": "var(--ac-medium-blue)",
+    "--line": "#dddddd",
+    "--line-strong": "rgba(10, 10, 10, .18)",
+    "--text": "var(--ac-text-blue)",
+    "--text-2": "#3a3f47",
+    "--muted": "#6a7079",
+    "--accent-from": "var(--ac-orange)",
+    "--accent-to": "var(--ac-orange)",
+    "--accent": "var(--ac-orange)",
+    "--on-accent": "var(--ac-white)",
+    "--primary": "var(--ac-orange)",
+    "--primary-soft": "var(--ac-card-orange)",
+    "--cyan": "var(--ac-light-cyan)",
+    "--green": "#0f9b6c",
+    "--green-soft": "rgba(15, 155, 108, .12)",
+    "--red": "#f23c13",
+    "--red-soft": "rgba(242, 60, 19, .12)",
+    "--orange": "var(--ac-orange)",
+    "--orange-soft": "var(--ac-card-orange)",
+    "--info": "var(--ac-light-cyan)",
+    "--purple": "var(--ac-dark-blue)",
+    "--purple-soft": "rgba(30, 58, 138, .12)",
+    "--shadow-sm": "0 4px 10px rgba(0,0,0,0.05)",
+    "--shadow": "0 12px 32px rgba(24, 32, 56, .1)",
+    "--shadow-lg": "0 24px 60px rgba(16, 24, 40, .18)",
+    "--glow": "0 4px 10px rgba(242, 138, 30, 0.3)",
+    "--focus-ring": "2px solid var(--ac-orange)"
+  },
+  "colorLiteralList": [
+    "#0f9b6c",
+    "#1a2b56",
+    "#1e3a8a",
+    "#234796",
+    "#3a3f47",
+    "#6a7079",
+    "#74d2e7",
+    "#c45500",
+    "#ddd",
+    "#dddddd",
+    "#e07712",
+    "#e5e8ec",
+    "#eaeaea",
+    "#f23c13",
+    "#f28a1e",
+    "#f8f9fa",
+    "#ffe8d6",
+    "#ffffff",
+    "rgba(0,0,0,0.05)",
+    "rgba(0,0,0,0.1)",
+    "rgba(10,10,10,.18)",
+    "rgba(15,155,108,.12)",
+    "rgba(16,24,40,.18)",
+    "rgba(24,32,56,.1)",
+    "rgba(242,138,30,0.1)",
+    "rgba(242,138,30,0.3)",
+    "rgba(242,60,19,.12)",
+    "rgba(30,58,138,.12)",
+    "rgba(30,58,138,0.6)"
+  ],
+  "layout": {
+    "sidebarWidth": "280px",
+    "appShellDisplay": "flex",
+    "appMainMarginLeft": "var(--sidebar-width)",
+    "mainMaxWidth": "1280px",
+    "has900Breakpoint": true,
+    "has600Breakpoint": true,
+    "gridTemplates": [
+      {
+        "selector": ".metric-grid",
+        "value": "repeat(auto-fit, minmax(200px, 1fr))",
+        "tracks": "auto-fit"
+      },
+      {
+        "selector": "/* ===== Tabelas e Gráficos ===== */ .dashboard-grid",
+        "value": "1.6fr 1fr",
+        "tracks": 2
+      },
+      {
+        "selector": ".bar-chart",
+        "value": "repeat(6, 1fr)",
+        "tracks": 6
+      },
+      {
+        "selector": ".form-grid.two",
+        "value": "1fr 1fr",
+        "tracks": 2
+      },
+      {
+        "selector": "/* ===== Componentes de UI ===== */ .card-grid",
+        "value": "repeat(auto-fill, minmax(300px, 1fr))",
+        "tracks": "auto-fill"
+      },
+      {
+        "selector": ".travel-search-form",
+        "value": "repeat(auto-fit, minmax(150px, 1fr))",
+        "tracks": "auto-fit"
+      },
+      {
+        "selector": ".dashboard-grid",
+        "value": "1fr",
+        "tracks": 1
+      },
+      {
+        "selector": ".dashboard-grid, .metric-grid",
+        "value": "1fr",
+        "tracks": 1
+      },
+      {
+        "selector": ".form-grid.two",
+        "value": "1fr",
+        "tracks": 1
+      }
+    ]
+  }
+}

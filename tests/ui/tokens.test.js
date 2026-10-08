@@ -126,3 +126,66 @@ describe('tokens.css — motion reduzido e fallback de backdrop', () => {
     expect(/@supports\s+not\s*\(\s*[\s\S]*?backdrop-filter/i.test(css)).toBe(true);
   });
 });
+
+/* ===================================================================
+ * TASK 9.2 — Extensões do refinamento visual (P5, P6, P8).
+ * P5: piso tipográfico (reforço, resolvendo também os tokens --fs-*).
+ * P6: recursos 100% locais (reforço — cobertos acima).
+ * P8: afordâncias de acessibilidade preservadas.
+ * =================================================================== */
+
+describe('tokens.css — P5: tokens --fs-* respeitam o piso de 13px', () => {
+  const BASE_PX = 16;
+  const FLOOR_PX = 12.9;
+
+  // Resolve o valor de cada token --fs-* definido em :root para px.
+  function fontScaleTokens(source) {
+    const root = (source.match(/:root\s*\{[\s\S]*?\}/i) || [''])[0];
+    const re = /--fs-([a-z0-9]+)\s*:\s*([^;}]+)[;}]/gi;
+    const out = [];
+    let m;
+    while ((m = re.exec(root)) !== null) {
+      const name = `--fs-${m[1]}`;
+      const raw = m[2].trim();
+      const rem = raw.match(/^(-?\d*\.?\d+)rem$/i);
+      const px = raw.match(/^(-?\d*\.?\d+)px$/i);
+      if (rem) out.push({ name, px: parseFloat(rem[1]) * BASE_PX });
+      else if (px) out.push({ name, px: parseFloat(px[1]) });
+    }
+    return out;
+  }
+
+  it('define pelo menos 8 degraus na escala tipográfica', () => {
+    expect(fontScaleTokens(css).length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('nenhum token --fs-* resolve abaixo do piso (>= 12.9px; alvo 13px)', () => {
+    const tooSmall = fontScaleTokens(css).filter((t) => t.px < FLOOR_PX);
+    expect(tooSmall).toEqual([]);
+  });
+
+  it('o degrau mínimo (--fs-xs) é exatamente o piso de 13px', () => {
+    const xs = fontScaleTokens(css).find((t) => t.name === '--fs-xs');
+    expect(xs).toBeDefined();
+    expect(xs.px).toBeGreaterThanOrEqual(FLOOR_PX);
+    expect(xs.px).toBeLessThanOrEqual(13.1);
+  });
+});
+
+describe('tokens.css — P8: afordâncias de acessibilidade preservadas', () => {
+  it('mantém o token --focus-ring', () => {
+    expect(/--focus-ring\s*:/i.test(css)).toBe(true);
+  });
+
+  it('mantém estilo de :focus-visible usando o anel de foco', () => {
+    expect(/:focus-visible\s*\{[^}]*outline:\s*var\(--focus-ring\)/i.test(css)).toBe(true);
+  });
+
+  it('mantém o bloco @media (prefers-reduced-motion: reduce)', () => {
+    expect(/@media[^{]*prefers-reduced-motion:\s*reduce/i.test(css)).toBe(true);
+  });
+
+  it('mantém o fallback @supports not (backdrop-filter ...)', () => {
+    expect(/@supports\s+not\s*\(\s*[\s\S]*?backdrop-filter/i.test(css)).toBe(true);
+  });
+});

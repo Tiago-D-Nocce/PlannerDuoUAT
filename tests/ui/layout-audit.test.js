@@ -135,3 +135,66 @@ describe('layout-audit — ícones decorativos com aria-hidden', () => {
     expect(hits.length).toBeGreaterThanOrEqual(10);
   });
 });
+
+/* ===================================================================
+ * TASK 9.3 — Guardas do refinamento visual (P4 + reforço de P3).
+ * P4: nenhuma regressão de largura fixa larga (>= 360px) fora de @media.
+ * P3: breakpoints de 900px e 600px continuam presentes.
+ * =================================================================== */
+
+describe('layout-audit — P4: sem largura fixa larga fora de @media (refinamento)', () => {
+  // Reusa a mesma estratégia da auditoria: descarta blocos @media e procura
+  // width: >= 360px em regras não decorativas.
+  function stripMedia(source) {
+    let out = '';
+    let i = 0;
+    while (i < source.length) {
+      const at = source.indexOf('@media', i);
+      if (at === -1) { out += source.slice(i); break; }
+      out += source.slice(i, at);
+      const open = source.indexOf('{', at);
+      if (open === -1) break;
+      let depth = 1;
+      let j = open + 1;
+      while (j < source.length && depth > 0) {
+        if (source[j] === '{') depth += 1;
+        else if (source[j] === '}') depth -= 1;
+        j += 1;
+      }
+      i = j;
+    }
+    return out;
+  }
+
+  function wideFixedWidths(source) {
+    const top = stripMedia(source);
+    const ruleRe = /([^{}]+)\{([^{}]*)\}/g;
+    const offenders = [];
+    let m;
+    while ((m = ruleRe.exec(top)) !== null) {
+      const selector = m[1].trim();
+      const body = m[2];
+      const decorative = /::(before|after)/i.test(selector);
+      const widthRe = /(^|[;{\s])width:\s*(\d+)px/gi;
+      let w;
+      while ((w = widthRe.exec(body)) !== null) {
+        const px = parseInt(w[2], 10);
+        if (px >= 360 && !decorative) offenders.push({ selector, px });
+      }
+    }
+    return offenders;
+  }
+
+  it('não introduziu width: >= 360px fixo fora de @media', () => {
+    expect(wideFixedWidths(css)).toEqual([]);
+  });
+});
+
+describe('layout-audit — P3: breakpoints preservados após o refinamento', () => {
+  it('@media (max-width: 900px) continua presente', () => {
+    expect(/@media[^{]*\(\s*max-width:\s*900px\s*\)/i.test(css)).toBe(true);
+  });
+  it('@media (max-width: 600px) continua presente', () => {
+    expect(/@media[^{]*\(\s*max-width:\s*600px\s*\)/i.test(css)).toBe(true);
+  });
+});
