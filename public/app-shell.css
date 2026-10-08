@@ -1,0 +1,770 @@
+/* =============================================================================
+ * app-shell.css — Acabamento visual das classes órfãs de app.html.
+ *
+ * Regras:
+ *  - Paleta inalterada: usa SOMENTE tokens já definidos em :root de style.css.
+ *  - Zero hex novo. Só var(--...), rgba() com canais decimais, currentColor,
+ *    transparent e valores de layout (px/rem/%/fr).
+ *  - Nenhum font-size abaixo de 13px (sempre via tokens --fs-*).
+ *  - Nenhuma largura fixa >= 360px fora de @media.
+ *  - Não edita style.css/central-view.css; apenas complementa.
+ * ========================================================================== */
+
+/* 0) Correção de bug: .button.danger referencia var(--ac-red) inexistente. */
+.button.danger {
+  background-color: var(--red);
+  color: var(--ac-white);
+}
+.button.danger:hover {
+  background-color: var(--red);
+  filter: brightness(0.94);
+}
+
+/* 1) Casca da aplicação / estrutura de página. */
+.app-body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: calc(var(--space-3) * -10);
+  z-index: 1000;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  background-color: var(--ac-dark-blue);
+  color: var(--ac-white);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+  transition: top var(--t-base);
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: var(--space-3);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-8);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.app-footer-dot {
+  color: var(--line-strong);
+  font-size: var(--fs-sm);
+  line-height: 1;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background-color: rgba(30, 58, 138, 0.5);
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-base);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background-color: var(--green);
+  vertical-align: middle;
+}
+
+/* 2) Chips de perfil na sidebar (fundo azul institucional). */
+.workspace-mini,
+.sidebar-account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--ac-white);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.workspace-mini-icon,
+.sidebar-account-avatar {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background-color: var(--ac-light-cyan);
+  color: var(--ac-text-blue);
+  font-size: var(--fs-md);
+  font-weight: 800;
+}
+.workspace-mini-copy,
+.sidebar-account > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.workspace-mini-copy strong,
+.sidebar-account strong {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ac-white);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-mini-copy span,
+.sidebar-account small {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--ac-light-cyan);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.participant-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-4);
+}
+.icon-button.dark {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--ac-white);
+}
+.icon-button.dark:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.mobile-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 3) Dashboard: faixa de participantes e tons dos metric-card. */
+.participant-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+.metric-card.tone-green .metric-icon {
+  background-color: var(--green-soft);
+  color: var(--green);
+}
+.metric-card.tone-red .metric-icon {
+  background-color: var(--red-soft);
+  color: var(--red);
+}
+.metric-card.tone-blue .metric-icon {
+  background-color: var(--primary-soft);
+  color: var(--ac-dark-blue);
+}
+.metric-card.tone-purple .metric-icon {
+  background-color: var(--purple-soft);
+  color: var(--purple);
+}
+.metric-grid.mini {
+  gap: var(--space-4);
+}
+.metric-grid.mini .metric-card {
+  padding: var(--space-4);
+}
+.panel-wide {
+  min-width: 0;
+}
+.dashboard-grid.lower {
+  margin-top: var(--space-5);
+}
+.chart-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.chart-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  margin-left: var(--space-2);
+}
+.chart-legend i.income {
+  background-color: var(--green);
+}
+.chart-legend i.expense {
+  background-color: var(--red);
+}
+.category-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 160px;
+}
+.bar-chart.tall {
+  min-height: 300px;
+}
+
+/* 4) Finanças: filtros, campo de busca e layout painel + aside. */
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.filters-row > select,
+.filters-row > input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.filters-row > .button {
+  flex: 0 0 auto;
+}
+.search-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--muted);
+}
+.search-field:focus-within {
+  border-color: var(--ac-orange);
+  box-shadow: var(--glow);
+}
+.search-field span {
+  flex: 0 0 auto;
+  font-size: var(--fs-base);
+  line-height: 1;
+}
+.search-field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: var(--space-3) 0;
+  color: var(--text);
+  font-size: var(--fs-base);
+}
+.search-field input:focus {
+  outline: none;
+}
+.finance-layout {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+.table-panel {
+  min-width: 0;
+}
+.budget-panel {
+  min-width: 0;
+}
+
+/* 5) Viagens: cabeçalho de busca, campos e grade de sites. */
+.travel-search-header {
+  margin-bottom: var(--space-5);
+}
+.travel-search-kicker {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--ac-orange);
+}
+.travel-location-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.travel-location-field > span {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.travel-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+}
+.travel-input-wrap:focus-within {
+  border-color: var(--ac-orange);
+  box-shadow: var(--glow);
+}
+.travel-input-wrap i {
+  flex: 0 0 auto;
+  color: var(--ac-orange);
+  font-style: normal;
+  line-height: 1;
+}
+.travel-input-wrap input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: var(--space-3) 0;
+  color: var(--text);
+  font-size: var(--fs-base);
+}
+.travel-input-wrap input:focus {
+  outline: none;
+}
+.travel-main-search {
+  width: 100%;
+}
+.travel-provider-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+.travel-provider-filters {
+  flex-wrap: wrap;
+}
+.travel-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+.travel-search-status {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background-color: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.travel-plans-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin: var(--space-7) 0 var(--space-5);
+}
+.travel-plans-heading h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: var(--lh-tight);
+  color: var(--ac-dark-blue);
+}
+
+/* 6) Grupo segmentado (toggle pílula). */
+.segmented {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.segmented button {
+  appearance: none;
+  min-height: 36px;
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.segmented button:hover {
+  color: var(--ac-dark-blue);
+}
+.segmented button.active,
+.segmented button[aria-pressed="true"] {
+  background-color: var(--ac-orange);
+  color: var(--ac-white);
+  box-shadow: var(--shadow-sm);
+}
+.segmented button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.decision-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-5);
+}
+
+/* 7) Checklist: progresso e barra. */
+.checklist-progress-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.progress-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.progress-copy strong {
+  font-size: var(--fs-md);
+  color: var(--ac-dark-blue);
+}
+.progress-copy span {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--ac-orange);
+}
+.progress-track {
+  position: relative;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-3);
+  overflow: hidden;
+}
+.progress-track > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: var(--radius-pill);
+  background-color: var(--ac-orange);
+  transition: width var(--t-slow);
+}
+.checklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 8) Configurações: grades, formulários e painéis. */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+.inline-form label {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.participant-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.participant-add-form > input:not([type="color"]) {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.participant-add-form input[type="color"] {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  cursor: pointer;
+}
+.participant-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.security-card,
+.privacy-card {
+  display: flex;
+  flex-direction: column;
+}
+.privacy-icon {
+  font-size: var(--fs-lg);
+  color: var(--ac-orange);
+  line-height: 1;
+}
+.security-account-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius);
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.security-account-summary > span[id] {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background-color: var(--ac-dark-blue);
+  color: var(--ac-white);
+  font-size: var(--fs-lg);
+}
+.security-account-summary > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.security-account-summary strong {
+  font-size: var(--fs-base);
+  color: var(--text);
+}
+.security-account-summary small {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.security-state {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background-color: var(--green-soft);
+  color: var(--green);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+.panel-description {
+  margin: 0 0 var(--space-4);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+}
+
+/* Avisos: conflito legado e zona de perigo. */
+.danger-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background-color: var(--red-soft);
+  border: 1px solid var(--line);
+}
+.legacy-conflict {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.legacy-conflict strong,
+.danger-zone strong {
+  display: block;
+  color: var(--text);
+  font-size: var(--fs-base);
+}
+.legacy-conflict span,
+.danger-zone span {
+  display: block;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.legacy-conflict .button-row {
+  margin-top: var(--space-2);
+}
+.form-help {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-base);
+}
+
+/* 9) Botões de texto e modificadores de tamanho. */
+.text-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--ac-orange);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--t-fast);
+}
+.text-button:hover {
+  color: var(--ac-orange-hover);
+  text-decoration: underline;
+}
+.text-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.button.small,
+.segmented button.small {
+  min-height: 36px;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--fs-sm);
+}
+.button.mini {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--fs-sm);
+}
+
+/* 10) Diálogos: escolhas, check, variantes, setup e paleta de comandos. */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2);
+}
+.check-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+.check-control input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ac-orange);
+  cursor: pointer;
+}
+.trip-title-grid {
+  grid-template-columns: 1fr auto;
+}
+.dialog.small-dialog {
+  width: min(460px, 95vw);
+}
+.dialog.setup-dialog .setup-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background-color: var(--ac-card-orange);
+  color: var(--ac-orange);
+  font-size: var(--fs-3xl);
+}
+.setup-visual i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background-color: var(--ac-orange);
+  opacity: 0.5;
+}
+.command-palette-dialog {
+  width: min(560px, 95vw);
+  padding: 0;
+}
+.command-palette {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  gap: var(--space-3);
+}
+.command-palette-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+}
+.command-palette-search:focus-within {
+  border-color: var(--ac-orange);
+  box-shadow: var(--glow);
+}
+.command-palette-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: var(--space-3) 0;
+  color: var(--text);
+  font-size: var(--fs-base);
+}
+.command-palette-search input:focus {
+  outline: none;
+}
+.command-palette-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+/* 11) Responsividade dos layouts largos. */
+@media (max-width: 900px) {
+  .finance-layout {
+    grid-template-columns: 1fr;
+  }
+  .trip-title-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .settings-grid,
+  .decision-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-footer {
+    padding: var(--space-4) var(--space-5);
+  }
+  .travel-plans-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+}
