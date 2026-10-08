@@ -15,8 +15,8 @@
 
   <div id="app-loading" class="app-loading" role="status" aria-live="polite">
     <div class="loading-mark" aria-hidden="true">P</div>
-    <strong>Abrindo seu espaço</strong>
-    <span>Validando a sessão e descriptografando os dados.</span>
+    <strong>A abrir o seu espaço</strong>
+    <span>A validar a sessão e a desencriptar os dados.</span>
   </div>
 
   <div class="app-shell" id="app-shell" hidden>
@@ -36,12 +36,12 @@
       </div>
       <div class="sidebar-account" id="sidebar-account" style="display: none;">
         <span class="sidebar-account-avatar" id="sidebar-account-avatar">?</span>
-        <div><strong id="sidebar-account-name">Conta local</strong><small id="sidebar-account-email">Conectado</small></div>
+        <div><strong id="sidebar-account-name">Conta local</strong><small id="sidebar-account-email">Ligado</small></div>
       </div>
       <div class="participant-stack" id="sidebar-participants" aria-label="Participantes" style="display: none;"></div>
 
       <nav class="nav-list">
-        <span class="nav-label sr-only">Planejar</span>
+        <span class="nav-label sr-only">Planear</span>
         <button class="nav-item" type="button" data-view="central"><span aria-hidden="true">✦</span>Assistente</button>
         <button class="nav-item" type="button" data-view="dashboard"><span aria-hidden="true">⌂</span>Visão geral</button>
         <button class="nav-item" type="button" data-view="finances"><span aria-hidden="true">↕</span>Finanças <b id="nav-finance-count" hidden>0</b></button>
@@ -58,11 +58,11 @@
         <div class="sidebar-institucional">
           <span class="institucional-title">Institucional</span>
           <a href="#">Quem somos?</a>
-          <a href="#">Fale conosco</a>
+          <a href="#">Fale connosco</a>
           <a href="#">Termos de Uso</a>
           <a href="#">Política de Privacidade</a>
         </div>
-        <!-- Controles ocultos pelo CSS para manter compatibilidade JS com o comando Ctrl+K -->
+        <!-- Controlos ocultos pelo CSS para manter compatibilidade JS com o comando Ctrl+K -->
         <button class="icon-button dark sr-only" type="button" data-action="open-command-palette"><span aria-hidden="true">⌘</span></button>
       </div>
     </aside>
@@ -89,11 +89,12 @@
         <section class="view" id="view-central" data-view-panel="central">
           <div id="central-root"></div>
         </section>
+        
         <section class="view" id="view-dashboard" data-view-panel="dashboard">
           <div class="hero-card">
             <div class="hero-copy">
               <span class="eyebrow">WORKSPACE LOCAL</span>
-              <h1 id="dashboard-greeting">Planeje do seu jeito.</h1>
+              <h1 id="dashboard-greeting">Planeie à sua maneira.</h1>
               <p id="dashboard-subtitle">Adicione participantes quando quiser ou use o espaço individualmente.</p>
               <div class="hero-actions">
                 <button class="button primary" type="button" data-open-dialog="transaction-dialog">Nova transação</button>
@@ -130,12 +131,13 @@
           </div>
         </section>
         
+        <!-- SECÇÕES RESTANTES PRESERVADAS NA ÍNTEGRA -->
         <section class="view" id="view-finances" data-view-panel="finances">
-          <div class="page-heading"><div><span class="eyebrow">CONTROLE FINANCEIRO</span><h1>Finanças</h1><p>Registre, divida e acompanhe cada movimentação.</p></div><button class="button primary" type="button" data-open-dialog="transaction-dialog">Nova transação</button></div>
+          <div class="page-heading"><div><span class="eyebrow">CONTROLO FINANCEIRO</span><h1>Finanças</h1><p>Registe, divida e acompanhe cada movimentação.</p></div><button class="button primary" type="button" data-open-dialog="transaction-dialog">Nova transação</button></div>
           <div class="summary-strip"><div><small>Receitas filtradas</small><strong class="positive" id="finance-income">R$ 0,00</strong></div><div><small>Despesas filtradas</small><strong class="negative" id="finance-expense">R$ 0,00</strong></div><div><small>Resultado</small><strong id="finance-balance">R$ 0,00</strong></div></div>
           <article class="panel compact-panel">
             <div class="filters-row">
-              <label class="search-field"><span aria-hidden="true">⌕</span><input id="finance-search" type="search" placeholder="Buscar por descrição" aria-label="Buscar transações por descrição"></label>
+              <label class="search-field"><span aria-hidden="true">⌕</span><input id="finance-search" type="search" placeholder="Procurar por descrição" aria-label="Procurar transações por descrição"></label>
               <select id="finance-type-filter" aria-label="Filtrar por tipo"><option value="all">Todos os tipos</option><option value="expense">Despesas</option><option value="income">Receitas</option></select>
               <select id="finance-participant-filter" aria-label="Filtrar por participante"><option value="all">Todos os participantes</option></select>
               <input id="finance-month-filter" type="month" aria-label="Filtrar por mês">
@@ -144,7 +146,7 @@
           </article>
           <div class="finance-layout">
             <article class="panel table-panel">
-              <div class="panel-heading"><div><span class="eyebrow">MOVIMENTAÇÕES</span><h2 id="finance-list-title">Todos os lançamentos</h2></div><button class="text-button" type="button" data-action="export-csv">Exportar CSV ↓</button></div>
+              <div class="panel-heading"><div><span class="eyebrow">MOVIMENTAÇÕES</span><h2 id="finance-list-title">Todos os registos</h2></div><button class="text-button" type="button" data-action="export-csv">Exportar CSV ↓</button></div>
               <div class="responsive-table"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Pago por</th><th>Valor</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="finance-table-body"></tbody></table></div>
             </article>
             <aside class="panel budget-panel">
@@ -155,13 +157,13 @@
         </section>
         
         <section class="view" id="view-trips" data-view-panel="trips">
-          <div class="page-heading"><div><span class="eyebrow">ROTEIROS, PASSAGENS E RESERVAS</span><h1>Viagens</h1><p>Compare opções em vários sites e organize seus planos no mesmo lugar.</p></div><button class="button primary" type="button" data-open-dialog="trip-dialog">Planejar viagem</button></div>
+          <div class="page-heading"><div><span class="eyebrow">ROTEIROS, PASSAGENS E RESERVAS</span><h1>Viagens</h1><p>Compare opções em vários sites e organize os seus planos no mesmo lugar.</p></div><button class="button primary" type="button" data-open-dialog="trip-dialog">Planear viagem</button></div>
           <article class="travel-search-panel" id="travel-search-panel">
             <div class="travel-search-header">
               <div>
                 <span class="travel-search-kicker">BUSCA MULTI-SITE</span>
-                <h2>Encontre a melhor opção para sua viagem</h2>
-                <p>Preencha uma vez e escolha onde pesquisar passagens, hospedagens ou rotas.</p>
+                <h2>Encontre a melhor opção para a sua viagem</h2>
+                <p>Preencha uma vez e escolha onde pesquisar passagens, alojamentos ou rotas.</p>
               </div>
             </div>
             <form id="travel-search-form" class="travel-search-form" novalidate>
@@ -170,20 +172,20 @@
               <label><span>Ida</span><input id="travel-search-departure" type="date"></label>
               <label><span>Volta</span><input id="travel-search-return" type="date"></label>
               <label><span>Viajantes</span><select id="travel-search-passengers"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option></select></label>
-              <button class="button travel-main-search primary" type="submit"><span aria-hidden="true">⌕</span> Buscar no Google Voos</button>
+              <button class="button travel-main-search primary" type="submit"><span aria-hidden="true">⌕</span> Pesquisar no Google Voos</button>
             </form>
             <div class="travel-provider-toolbar">
               <div class="segmented travel-provider-filters" role="group" aria-label="Filtrar sites de viagem">
                 <button class="active" type="button" data-travel-provider-filter="all" aria-pressed="true">Todos</button>
                 <button type="button" data-travel-provider-filter="flights" aria-pressed="false">Voos</button>
-                <button type="button" data-travel-provider-filter="stays" aria-pressed="false">Hospedagem</button>
-                <button type="button" data-travel-provider-filter="ground" aria-pressed="false">Ônibus</button>
+                <button type="button" data-travel-provider-filter="stays" aria-pressed="false">Alojamento</button>
+                <button type="button" data-travel-provider-filter="ground" aria-pressed="false">Autocarros</button>
               </div>
             </div>
             <div class="travel-provider-grid" id="travel-provider-grid"></div>
-            <div class="travel-search-status" id="travel-search-status">Sites marcados recebem o período na URL diretamente.</div>
+            <div class="travel-search-status" id="travel-search-status">Os sites marcados recebem o período na URL diretamente.</div>
           </article>
-          <div class="travel-plans-heading"><div><span class="eyebrow">SEUS ROTEIROS</span><h2>Viagens planejadas</h2></div></div>
+          <div class="travel-plans-heading"><div><span class="eyebrow">OS SEUS ROTEIROS</span><h2>Viagens planeadas</h2></div></div>
           <div class="card-grid" id="trip-grid"></div>
         </section>
         
@@ -196,7 +198,7 @@
         <section class="view" id="view-checklist" data-view-panel="checklist">
           <div class="page-heading"><div><span class="eyebrow">NADA FICA PARA TRÁS</span><h1>Checklist</h1><p>Organize itens gerais ou vincule-os a uma viagem.</p></div><button class="button primary" type="button" data-open-dialog="checklist-dialog">Adicionar item</button></div>
           <article class="panel checklist-progress-panel"><div class="progress-copy"><strong id="checklist-progress-label">0 de 0 concluídos</strong><span id="checklist-progress-percent">0%</span></div><div class="progress-track"><i id="checklist-progress-bar"></i></div></article>
-          <article class="panel compact-panel"><div class="filters-row"><select id="checklist-category-filter" aria-label="Filtrar checklist por categoria"><option value="all">Todas as categorias</option><option value="documentos">Documentos</option><option value="roupas">Roupas</option><option value="higiene">Higiene</option><option value="tecnologia">Tecnologia</option><option value="saude">Saúde</option><option value="outros">Outros</option></select><select id="checklist-trip-filter" aria-label="Filtrar checklist por viagem"><option value="all">Todas as viagens</option><option value="none">Sem viagem</option></select><button class="button ghost small" type="button" data-action="apply-checklist-template">Usar modelo de viagem</button><button class="button ghost small" type="button" data-action="clear-completed-checklist">Remover concluídos</button></div></article>
+          <article class="panel compact-panel"><div class="filters-row"><select id="checklist-category-filter" aria-label="Filtrar checklist por categoria"><option value="all">Todas as categorias</option><option value="documentos">Documentos</option><option value="roupas">Roupa</option><option value="higiene">Higiene</option><option value="tecnologia">Tecnologia</option><option value="saude">Saúde</option><option value="outros">Outros</option></select><select id="checklist-trip-filter" aria-label="Filtrar checklist por viagem"><option value="all">Todas as viagens</option><option value="none">Sem viagem</option></select><button class="button ghost small" type="button" data-action="apply-checklist-template">Usar modelo de viagem</button><button class="button ghost small" type="button" data-action="clear-completed-checklist">Remover concluídos</button></div></article>
           <div class="checklist-list" id="checklist-list"></div>
         </section>
         
@@ -207,18 +209,18 @@
         </section>
         
         <section class="view" id="view-reports" data-view-panel="reports">
-          <div class="page-heading"><div><span class="eyebrow">LEITURA DO HISTÓRICO</span><h1>Relatórios</h1><p>Compare meses e entenda a participação nos gastos.</p></div><button class="button ghost" type="button" data-action="export-csv">Exportar CSV ↓</button></div>
+          <div class="page-heading"><div><span class="eyebrow">LEITURA DO HISTÓRICO</span><h1>Relatórios</h1><p>Compare meses e entenda a participação nas despesas.</p></div><button class="button ghost" type="button" data-action="export-csv">Exportar CSV ↓</button></div>
           <article class="panel compact-panel"><div class="filters-row"><select id="report-period" aria-label="Período do relatório"><option value="3">Últimos 3 meses</option><option value="6" selected>Últimos 6 meses</option><option value="12">Últimos 12 meses</option></select><select id="report-participant" aria-label="Participante do relatório"><option value="all">Todos os participantes</option></select></div></article>
           <div class="dashboard-grid"><article class="panel panel-wide"><div class="panel-heading"><div><span class="eyebrow">EVOLUÇÃO</span><h2>Receitas e despesas</h2></div></div><div id="report-chart" class="bar-chart tall"></div></article><article class="panel"><div class="panel-heading"><div><span class="eyebrow">PARTICIPAÇÃO</span><h2>Quem pagou</h2></div></div><div id="participant-report"></div></article></div>
           <article class="panel table-panel"><div class="panel-heading"><div><span class="eyebrow">CONSOLIDADO</span><h2>Resumo mensal</h2></div></div><div class="responsive-table"><table><thead><tr><th>Mês</th><th>Receitas</th><th>Despesas</th><th>Saldo</th></tr></thead><tbody id="report-table-body"></tbody></table></div></article>
         </section>
         
         <section class="view" id="view-settings" data-view-panel="settings">
-          <div class="page-heading"><div><span class="eyebrow">SEU ESPAÇO, SUAS REGRAS</span><h1>Configurações</h1><p>Nomes, participantes, backup e privacidade local.</p></div></div>
+          <div class="page-heading"><div><span class="eyebrow">O SEU ESPAÇO, AS SUAS REGRAS</span><h1>Configurações</h1><p>Nomes, participantes, backup e privacidade local.</p></div></div>
           <div class="settings-grid">
             <article class="panel">
               <div class="panel-heading"><div><span class="eyebrow">IDENTIDADE</span><h2>Nome do workspace</h2></div></div>
-              <form id="workspace-form" class="inline-form"><label><span>Nome</span><input id="workspace-name-input" maxlength="60" placeholder="Ex.: Nossa próxima fase"></label><button class="button primary" type="submit">Salvar</button></form>
+              <form id="workspace-form" class="inline-form"><label><span>Nome</span><input id="workspace-name-input" maxlength="60" placeholder="Ex.: A nossa próxima fase"></label><button class="button primary" type="submit">Guardar</button></form>
             </article>
             <article class="panel">
               <div class="panel-heading"><div><span class="eyebrow">PARTICIPANTES</span><h2>Quem participa</h2></div><span class="muted">Sem limite fixo</span></div>
@@ -228,19 +230,19 @@
             <article class="panel security-card">
               <div class="panel-heading"><div><span class="eyebrow">CONTA E SEGURANÇA</span><h2>Conta e segurança</h2></div><span class="privacy-icon" aria-hidden="true">⌗</span></div>
               <div class="security-account-summary"><span id="security-account-avatar" aria-hidden="true">⌾</span><div><strong id="security-account-name">Conta local</strong><small id="security-account-email"></small></div><span class="security-state">Protegido</span></div>
-              <p class="panel-description">AES-GCM protege o conteúdo em repouso. A sessão desta aba bloqueia automaticamente após 30 minutos sem atividade.</p>
+              <p class="panel-description">AES-GCM protege o conteúdo em repouso. A sessão deste separador bloqueia automaticamente após 30 minutos de inatividade.</p>
               <div class="button-row"><button class="button ghost" type="button" data-action="open-security">Alterar senha</button><button class="button ghost" type="button" data-action="lock-vault">Bloquear agora</button></div>
-              <div class="legacy-conflict" id="legacy-conflict" hidden><strong>Cópia legível detectada</strong><span>Uma aba antiga gravou dados após a migração. Baixe e confira antes de descartar.</span><div class="button-row"><button class="button ghost small" type="button" data-action="export-legacy-conflict">Baixar cópia</button><button class="button danger small" type="button" data-action="discard-legacy-conflict">Descartar cópia</button></div></div>
+              <div class="legacy-conflict" id="legacy-conflict" hidden><strong>Cópia legível detetada</strong><span>Um separador antigo gravou dados após a migração. Descarregue e verifique antes de descartar.</span><div class="button-row"><button class="button ghost small" type="button" data-action="export-legacy-conflict">Descarregar cópia</button><button class="button danger small" type="button" data-action="discard-legacy-conflict">Descartar cópia</button></div></div>
             </article>
             <article class="panel privacy-card">
-              <div class="panel-heading"><div><span class="eyebrow">PRIVACIDADE LOCAL</span><h2>Criptografado neste navegador</h2></div><span class="privacy-icon" aria-hidden="true">◉</span></div>
-              <p>Não há nuvem nem recuperação por e-mail. O conteúdo só é legível enquanto esta aba possui uma sessão desbloqueada.</p>
+              <div class="panel-heading"><div><span class="eyebrow">PRIVACIDADE LOCAL</span><h2>Encriptado neste navegador</h2></div><span class="privacy-icon" aria-hidden="true">◉</span></div>
+              <p>Não há nuvem nem recuperação por e-mail. O conteúdo só é legível enquanto este separador possui uma sessão desbloqueada.</p>
               <dl id="data-summary"></dl>
             </article>
             <article class="panel">
-              <div class="panel-heading"><div><span class="eyebrow">PORTABILIDADE SEGURA</span><h2>Backup e restauração</h2></div></div>
-              <p class="panel-description">O backup padrão permanece criptografado e exige a senha usada quando foi criado.</p>
-              <div class="button-row"><button class="button ghost" type="button" data-action="export-backup">Baixar backup</button><button class="button ghost" type="button" data-action="choose-import">Importar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div>
+              <div class="panel-heading"><div><span class="eyebrow">PORTABILIDADE SEGURA</span><h2>Backup e restauro</h2></div></div>
+              <p class="panel-description">O backup padrão permanece encriptado e exige a senha usada quando foi criado.</p>
+              <div class="button-row"><button class="button ghost" type="button" data-action="export-backup">Descarregar backup</button><button class="button ghost" type="button" data-action="choose-import">Importar backup</button><input id="backup-file-input" type="file" accept="application/json,.json" hidden></div>
               <div class="danger-zone"><div><strong>Recomeçar mantendo a conta</strong><span>Apaga o conteúdo do workspace, mas preserva a conta.</span></div><button class="button danger" type="button" data-action="reset-workspace">Apagar dados</button></div>
             </article>
           </div>
@@ -250,14 +252,15 @@
       <footer class="app-footer" aria-label="Rodapé">
         <span>PlannerDuo · workspace local e privado</span>
         <span class="app-footer-dot" aria-hidden="true">•</span>
-        <span>Dados criptografados neste navegador</span>
+        <span>Dados encriptados neste navegador</span>
       </footer>
     </div>
   </div>
 
+  <!-- Diálogos/Modais Preservados -->
   <dialog id="command-palette" class="dialog command-palette-dialog" aria-label="Paleta de comandos">
     <div class="command-palette">
-      <label class="command-palette-search"><span class="sr-only">Buscar comando</span><input id="command-palette-input" type="search" placeholder="Buscar comando…" autocomplete="off"></label>
+      <label class="command-palette-search"><span class="sr-only">Procurar comando</span><input id="command-palette-input" type="search" placeholder="Procurar comando…" autocomplete="off"></label>
       <ul id="command-palette-results" class="command-palette-results" role="listbox" aria-label="Comandos disponíveis"></ul>
     </div>
   </dialog>
@@ -268,58 +271,59 @@
       <input id="transaction-id" type="hidden">
       <div class="form-grid two"><label><span>Tipo</span><select id="transaction-type" required><option value="expense">Despesa</option><option value="income">Receita</option></select></label><label><span>Data</span><input id="transaction-date" type="date" required></label></div>
       <label><span>Descrição</span><input id="transaction-description" maxlength="100" placeholder="O que foi pago ou recebido?" required></label>
-      <div class="form-grid two"><label><span>Valor</span><input id="transaction-amount" inputmode="decimal" placeholder="0,00" required></label><label><span>Categoria</span><select id="transaction-category" required><option value="alimentacao">Alimentação</option><option value="transporte">Transporte</option><option value="moradia">Moradia</option><option value="lazer">Lazer</option><option value="saude">Saúde</option><option value="viagem">Viagem</option><option value="educacao">Educação</option><option value="vestuario">Vestuário</option><option value="salario">Salário</option><option value="investimento">Investimento</option><option value="outros">Outros</option></select></label></div>
+      <div class="form-grid two"><label><span>Valor</span><input id="transaction-amount" inputmode="decimal" placeholder="0,00" required></label><label><span>Categoria</span><select id="transaction-category" required><option value="alimentacao">Alimentação</option><option value="transporte">Transporte</option><option value="moradia">Alojamento</option><option value="lazer">Lazer</option><option value="saude">Saúde</option><option value="viagem">Viagem</option><option value="educacao">Educação</option><option value="vestuario">Vestuário</option><option value="salario">Salário</option><option value="investimento">Investimento</option><option value="outros">Outros</option></select></label></div>
       <div class="form-grid two"><label><span>Pago ou recebido por</span><select id="transaction-payer"><option value="">Não atribuir</option></select></label><label><span>Vincular a viagem</span><select id="transaction-trip"><option value="">Nenhuma viagem</option></select></label></div>
-      <fieldset id="transaction-split-field"><legend>Dividir a despesa entre</legend><p>Escolha livremente quem participa deste gasto.</p><div id="transaction-split-options" class="choice-grid"></div></fieldset>
+      <fieldset id="transaction-split-field"><legend>Dividir a despesa entre</legend><p>Escolha livremente quem participa neste gasto.</p><div id="transaction-split-options" class="choice-grid"></div></fieldset>
       <label><span>Observações</span><textarea id="transaction-notes" maxlength="300" placeholder="Detalhes opcionais"></textarea></label>
       <label class="check-control"><input id="transaction-recurring" type="checkbox"><span>Marcar como recorrente</span></label>
-      <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Salvar</button></div>
+      <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Guardar</button></div>
     </form>
   </dialog>
 
   <dialog id="trip-dialog" class="dialog" aria-label="Viagem">
-    <form id="trip-form"><div class="dialog-header"><div><span class="eyebrow">VIAGEM</span><h2 id="trip-dialog-title">Planejar viagem</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><input id="trip-id" type="hidden"><div class="form-grid trip-title-grid"><label><span>Destino</span><input id="trip-destination" maxlength="80" placeholder="Cidade ou roteiro" required></label><label><span>Emoji</span><input id="trip-emoji" maxlength="8" value="🧭"></label></div><div class="form-grid two"><label><span>Ida</span><input id="trip-start" type="date"></label><label><span>Volta</span><input id="trip-end" type="date"></label></div><div class="form-grid two"><label><span>Orçamento</span><input id="trip-budget" inputmode="decimal" placeholder="0,00"></label><label><span>Já reservado</span><input id="trip-saved" inputmode="decimal" placeholder="0,00"></label></div><label><span>Notas</span><textarea id="trip-notes" maxlength="500" placeholder="Hospedagem, roteiro, ideias..."></textarea></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Salvar</button></div></form>
+    <form id="trip-form"><div class="dialog-header"><div><span class="eyebrow">VIAGEM</span><h2 id="trip-dialog-title">Planear viagem</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><input id="trip-id" type="hidden"><div class="form-grid trip-title-grid"><label><span>Destino</span><input id="trip-destination" maxlength="80" placeholder="Cidade ou roteiro" required></label><label><span>Emoji</span><input id="trip-emoji" maxlength="8" value="🧭"></label></div><div class="form-grid two"><label><span>Ida</span><input id="trip-start" type="date"></label><label><span>Volta</span><input id="trip-end" type="date"></label></div><div class="form-grid two"><label><span>Orçamento</span><input id="trip-budget" inputmode="decimal" placeholder="0,00"></label><label><span>Já reservado</span><input id="trip-saved" inputmode="decimal" placeholder="0,00"></label></div><label><span>Notas</span><textarea id="trip-notes" maxlength="500" placeholder="Alojamento, roteiro, ideias..."></textarea></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>
   </dialog>
   
   <dialog id="goal-dialog" class="dialog" aria-label="Meta">
-    <form id="goal-form"><div class="dialog-header"><div><span class="eyebrow">META</span><h2 id="goal-dialog-title">Criar meta</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><input id="goal-id" type="hidden"><div class="form-grid trip-title-grid"><label><span>Título</span><input id="goal-title" maxlength="80" placeholder="Qual é o objetivo?" required></label><label><span>Emoji</span><input id="goal-emoji" maxlength="8" value="🎯"></label></div><div class="form-grid two"><label><span>Valor alvo</span><input id="goal-target" inputmode="decimal" placeholder="0,00" required></label><label><span>Valor atual</span><input id="goal-current" inputmode="decimal" placeholder="0,00"></label></div><label><span>Prazo</span><input id="goal-deadline" type="date"></label><label><span>Descrição</span><textarea id="goal-description" maxlength="300" placeholder="Por que esta meta importa?"></textarea></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Salvar</button></div></form>
+    <form id="goal-form"><div class="dialog-header"><div><span class="eyebrow">META</span><h2 id="goal-dialog-title">Criar meta</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><input id="goal-id" type="hidden"><div class="form-grid trip-title-grid"><label><span>Título</span><input id="goal-title" maxlength="80" placeholder="Qual é o objetivo?" required></label><label><span>Emoji</span><input id="goal-emoji" maxlength="8" value="🎯"></label></div><div class="form-grid two"><label><span>Valor alvo</span><input id="goal-target" inputmode="decimal" placeholder="0,00" required></label><label><span>Valor atual</span><input id="goal-current" inputmode="decimal" placeholder="0,00"></label></div><label><span>Prazo</span><input id="goal-deadline" type="date"></label><label><span>Descrição</span><textarea id="goal-description" maxlength="300" placeholder="Porquê que esta meta importa?"></textarea></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>
   </dialog>
   
   <dialog id="checklist-dialog" class="dialog small-dialog" aria-label="Item do checklist">
-    <form id="checklist-form"><div class="dialog-header"><div><span class="eyebrow">CHECKLIST</span><h2 id="checklist-dialog-title">Adicionar item</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><input id="checklist-id" type="hidden"><label><span>Item</span><input id="checklist-text" maxlength="120" placeholder="O que não pode ser esquecido?" required></label><div class="form-grid two"><label><span>Categoria</span><select id="checklist-category"><option value="documentos">Documentos</option><option value="roupas">Roupas</option><option value="higiene">Higiene</option><option value="tecnologia">Tecnologia</option><option value="saude">Saúde</option><option value="outros">Outros</option></select></label><label><span>Viagem</span><select id="checklist-trip"><option value="">Nenhuma</option></select></label></div><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Salvar</button></div></form>
+    <form id="checklist-form"><div class="dialog-header"><div><span class="eyebrow">CHECKLIST</span><h2 id="checklist-dialog-title">Adicionar item</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><input id="checklist-id" type="hidden"><label><span>Item</span><input id="checklist-text" maxlength="120" placeholder="O que não pode ser esquecido?" required></label><div class="form-grid two"><label><span>Categoria</span><select id="checklist-category"><option value="documentos">Documentos</option><option value="roupas">Roupa</option><option value="higiene">Higiene</option><option value="tecnologia">Tecnologia</option><option value="saude">Saúde</option><option value="outros">Outros</option></select></label><label><span>Viagem</span><select id="checklist-trip"><option value="">Nenhuma</option></select></label></div><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>
   </dialog>
   
   <dialog id="decision-dialog" class="dialog" aria-label="Decisão">
-    <form id="decision-form"><div class="dialog-header"><div><span class="eyebrow">DECISÃO</span><h2>Nova votação</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><label><span>Pergunta ou título</span><input id="decision-title" maxlength="120" placeholder="O que precisa ser decidido?" required></label><label><span>Contexto</span><textarea id="decision-description" maxlength="400" placeholder="Explique o cenário para todos"></textarea></label><label><span>Opções — uma por linha</span><textarea id="decision-options" rows="5" placeholder="Primeira alternativa&#10;Segunda alternativa" required></textarea><small class="form-help">Informe pelo menos duas opções diferentes.</small></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Salvar</button></div></form>
+    <form id="decision-form"><div class="dialog-header"><div><span class="eyebrow">DECISÃO</span><h2>Nova votação</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><label><span>Pergunta ou título</span><input id="decision-title" maxlength="120" placeholder="O que precisa ser decidido?" required></label><label><span>Contexto</span><textarea id="decision-description" maxlength="400" placeholder="Explique o cenário para todos"></textarea></label><label><span>Opções — uma por linha</span><textarea id="decision-options" rows="5" placeholder="Primeira alternativa&#10;Segunda alternativa" required></textarea><small class="form-help">Indique pelo menos duas opções diferentes.</small></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>
   </dialog>
   
   <dialog id="budget-dialog" class="dialog small-dialog" aria-label="Orçamento mensal">
-    <form id="budget-form"><div class="dialog-header"><div><span class="eyebrow">ORÇAMENTO</span><h2>Definir limite mensal</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><label><span>Categoria</span><select id="budget-category"><option value="alimentacao">Alimentação</option><option value="transporte">Transporte</option><option value="moradia">Moradia</option><option value="lazer">Lazer</option><option value="saude">Saúde</option><option value="viagem">Viagem</option><option value="educacao">Educação</option><option value="vestuario">Vestuário</option><option value="outros">Outros</option></select></label><label><span>Limite</span><input id="budget-amount" inputmode="decimal" placeholder="0,00" required></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Salvar</button></div></form>
+    <form id="budget-form"><div class="dialog-header"><div><span class="eyebrow">ORÇAMENTO</span><h2>Definir limite mensal</h2></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div><label><span>Categoria</span><select id="budget-category"><option value="alimentacao">Alimentação</option><option value="transporte">Transporte</option><option value="moradia">Alojamento</option><option value="lazer">Lazer</option><option value="saude">Saúde</option><option value="viagem">Viagem</option><option value="educacao">Educação</option><option value="vestuario">Vestuário</option><option value="outros">Outros</option></select></label><label><span>Limite</span><input id="budget-amount" inputmode="decimal" placeholder="0,00" required></label><div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Guardar</button></div></form>
   </dialog>
   
   <dialog id="setup-dialog" class="dialog setup-dialog" aria-label="Configurar workspace">
-    <form id="setup-form"><div class="setup-visual" aria-hidden="true"><span>✦</span><i></i><i></i></div><div class="dialog-header"><div><span class="eyebrow">COMECE EM BRANCO</span><h2>Monte seu workspace</h2><p>Não há perfis predefinidos. Você decide o nome e quem participa.</p></div><button class="dialog-close" type="button" data-action="dismiss-setup" aria-label="Fechar">×</button></div><label><span>Nome do workspace <em>opcional</em></span><input id="setup-workspace-name" maxlength="60" placeholder="Dê um nome ao seu espaço"></label><label><span>Participantes <em>opcional</em></span><textarea id="setup-participants" rows="4" placeholder="Digite um nome por linha"></textarea><small class="form-help">Você pode adicionar, renomear ou arquivar participantes depois.</small></label><div class="dialog-actions"><button class="button ghost" type="button" data-action="dismiss-setup">Decidir depois</button><button class="button primary" type="submit">Criar meu espaço</button></div></form>
+    <form id="setup-form"><div class="setup-visual" aria-hidden="true"><span>✦</span><i></i><i></i></div><div class="dialog-header"><div><span class="eyebrow">COMECE EM BRANCO</span><h2>Monte o seu workspace</h2><p>Não há perfis predefinidos. Decide o nome e quem participa.</p></div><button class="dialog-close" type="button" data-action="dismiss-setup" aria-label="Fechar">×</button></div><label><span>Nome do workspace <em>opcional</em></span><input id="setup-workspace-name" maxlength="60" placeholder="Dê um nome ao seu espaço"></label><label><span>Participantes <em>opcional</em></span><textarea id="setup-participants" rows="4" placeholder="Escreva um nome por linha"></textarea><small class="form-help">Pode adicionar, renomear ou arquivar participantes mais tarde.</small></label><div class="dialog-actions"><button class="button ghost" type="button" data-action="dismiss-setup">Decidir depois</button><button class="button primary" type="submit">Criar o meu espaço</button></div></form>
   </dialog>
   
   <dialog id="security-dialog" class="dialog small-dialog" aria-label="Alterar senha">
     <form id="security-form">
-      <div class="dialog-header"><div><span class="eyebrow">SEGURANÇA</span><h2>Alterar senha</h2><p>Todo o conteúdo será recriptografado e as outras abas serão bloqueadas.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
+      <div class="dialog-header"><div><span class="eyebrow">SEGURANÇA</span><h2>Alterar senha</h2><p>Todo o conteúdo será reencriptado e os outros separadores serão bloqueados.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
       <label><span>Senha atual</span><input id="security-current-password" type="password" autocomplete="current-password" maxlength="128" required></label>
       <label><span>Nova senha</span><input id="security-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
       <label><span>Confirme a nova senha</span><input id="security-confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>
-      <small class="form-help">Use pelo menos 10 caracteres, com letra e número. Não há recuperação por e-mail.</small>
-      <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Recriptografar e salvar</button></div>
+      <small class="form-help">Use pelo menos 10 caracteres, com letras e números. Não há recuperação por e-mail.</small>
+      <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Reencriptar e guardar</button></div>
     </form>
   </dialog>
   
   <dialog id="backup-password-dialog" class="dialog small-dialog" aria-label="Senha do backup">
     <form id="backup-password-form">
-      <div class="dialog-header"><div><span class="eyebrow">BACKUP PROTEGIDO</span><h2>Desbloquear arquivo</h2><p>Use a senha definida quando este backup foi criado.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
+      <div class="dialog-header"><div><span class="eyebrow">BACKUP PROTEGIDO</span><h2>Desbloquear ficheiro</h2><p>Use a senha definida quando este backup foi criado.</p></div><button class="dialog-close" type="button" data-close-dialog aria-label="Fechar">×</button></div>
       <label><span>Senha do backup</span><input id="backup-password" type="password" autocomplete="off" maxlength="128" required></label>
       <div class="dialog-actions"><button class="button ghost" type="button" data-close-dialog>Cancelar</button><button class="button primary" type="submit">Validar e importar</button></div>
     </form>
   </dialog>
 
+  <!-- Módulos JS Injetados (Mantidos iguais à estrutura do repositório) -->
   <script src="core.js"></script>
   <script src="local.js"></script>
   <script src="travel.js"></script>
